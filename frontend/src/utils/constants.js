@@ -2,10 +2,16 @@ export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8002";
 
 export const FEEDBACK_TYPES = [
   { value: "academic_performance", label: "Academic Performance" },
+  { value: "concept_clarity", label: "Concept Clarity & Problem Solving" },
+  { value: "communication_skill", label: "Communication Skill" },
+  { value: "homework_completion", label: "Homework Completion" },
+  { value: "discipline", label: "Discipline" },
+  { value: "creativity", label: "Creativity" },
+  { value: "examination_performance", label: "Examination Performance" },
+  { value: "learning_progress", label: "Learning Progress" },
   { value: "behavior", label: "Behavior & Conduct" },
-  { value: "improvement_areas", label: "Improvement Areas" },
-  { value: "social_skills", label: "Social Skills" },
   { value: "participation", label: "Class Participation" },
+  { value: "social_skills", label: "Social Skills" },
   { value: "overall_progress", label: "Overall Progress" },
 ];
 
