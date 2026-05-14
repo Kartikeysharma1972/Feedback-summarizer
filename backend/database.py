@@ -25,10 +25,16 @@ async def init_db():
                 generated_feedback TEXT NOT NULL,
                 tone TEXT NOT NULL,
                 grade_level TEXT NOT NULL,
+                ratings TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+        # Add ratings column to existing tables (safe migration)
+        try:
+            await db.execute("ALTER TABLE feedback_history ADD COLUMN ratings TEXT")
+        except Exception:
+            pass  # Column already exists
         await db.execute("""
             CREATE TABLE IF NOT EXISTS summary_history (
                 id TEXT PRIMARY KEY,

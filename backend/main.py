@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
@@ -70,27 +71,28 @@ async def login(req: LoginRequest, db=Depends(get_db)):
 async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
     try:
         feedback_text = await generate_feedback(
-            req.student_name, req.feedback_type, req.context, req.tone, req.grade_level
+            req.student_name, req.feedback_type, req.context, req.tone, req.grade_level, req.ratings
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     feedback_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    ratings_json = json.dumps(req.ratings) if req.ratings else None
 
     await db.execute(
         """INSERT INTO feedback_history
-           (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (feedback_id, req.user_id, req.student_name, req.feedback_type,
-         req.context, feedback_text, req.tone, req.grade_level, now),
+         req.context, feedback_text, req.tone, req.grade_level, ratings_json, now),
     )
     await db.commit()
 
     return FeedbackResponse(
         id=feedback_id, student_name=req.student_name, feedback_type=req.feedback_type,
         context=req.context, tone=req.tone, grade_level=req.grade_level,
-        generated_feedback=feedback_text, created_at=now,
+        generated_feedback=feedback_text, ratings=req.ratings, created_at=now,
     )
 
 
@@ -101,13 +103,21 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
         (user_id,),
     )
     rows = await cursor.fetchall()
-    return [
-        FeedbackResponse(
+    results = []
+    for r in rows:
+        ratings_data = None
+        try:
+            if len(r) > 9 and r[9]:
+                ratings_data = json.loads(r[9])
+        except Exception:
+            pass
+        created = r[8] if len(r) <= 9 else (r[10] if len(r) > 10 else r[8])
+        results.append(FeedbackResponse(
             id=r[0], student_name=r[2], feedback_type=r[3], context=r[4],
-            generated_feedback=r[5], tone=r[6], grade_level=r[7], created_at=r[8],
-        )
-        for r in rows
-    ]
+            generated_feedback=r[5], tone=r[6], grade_level=r[7],
+            ratings=ratings_data, created_at=r[8],
+        ))
+    return results
 
 
 @app.delete("/feedback/history/{feedback_id}")

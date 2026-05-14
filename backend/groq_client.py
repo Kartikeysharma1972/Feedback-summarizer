@@ -11,7 +11,7 @@ def _get_client():
     return _client
 
 
-async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str) -> str:
+async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None) -> str:
     client = _get_client()
 
     type_labels = {
@@ -43,17 +43,25 @@ Your feedback should be:
 
 Do NOT use markdown headers or bullet points. Write in natural paragraph form as a teacher would in a report card or parent letter."""
 
+    ratings_text = ""
+    if ratings:
+        ratings_lines = []
+        for key, val in ratings.items():
+            label = type_labels.get(key, key.replace("_", " ").title())
+            ratings_lines.append(f"  - {label}: {val}/5 stars")
+        ratings_text = "\n\nTeacher's Star Ratings:\n" + "\n".join(ratings_lines)
+
     user_prompt = f"""Write personalized feedback for a student with these details:
 
 Student Name: {student_name}
 Grade Level: {grade_level}
 Feedback Type: {type_labels.get(feedback_type, feedback_type)}
-Tone: {tone_labels.get(tone, tone)}
+Tone: {tone_labels.get(tone, tone)}{ratings_text}
 
 Teacher's Notes/Context:
 {context}
 
-Please write the feedback directly addressing the student's performance. Start with the student's name."""
+Please write the feedback considering the star ratings given (1=Poor, 5=Excellent). Address areas with low ratings with improvement suggestions and acknowledge high-rated areas. Start with the student's name."""
 
     try:
         response = await client.chat.completions.create(

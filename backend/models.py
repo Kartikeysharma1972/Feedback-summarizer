@@ -26,6 +26,7 @@ class FeedbackRequest(BaseModel):
     tone: str
     grade_level: str
     user_id: str
+    ratings: Optional[dict] = None  # {"academic_performance": 4, "behavior": 3, ...}
 
 
 class FeedbackResponse(BaseModel):
@@ -36,6 +37,7 @@ class FeedbackResponse(BaseModel):
     tone: str
     grade_level: str
     generated_feedback: str
+    ratings: Optional[dict] = None
     created_at: str
 
 
