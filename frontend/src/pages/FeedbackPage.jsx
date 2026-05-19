@@ -2,7 +2,8 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   PenTool, Send, Copy, Check, RefreshCw, Sparkles,
-  User, BookOpen, MessageSquare, Heart, Star, Download
+  User, BookOpen, MessageSquare, Heart, Star, Download,
+  Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
 import { FEEDBACK_TYPES, TONES, GRADE_LEVELS } from "../utils/constants";
@@ -222,6 +223,9 @@ export default function FeedbackPage({ user }) {
   const [ratings, setRatings] = useState({});
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [originalFeedback, setOriginalFeedback] = useState("");
+  const editorRef = useRef(null);
   const { loading, error, execute, setError } = useApi();
 
   const handleRatingChange = (type, value) => {
@@ -248,12 +252,42 @@ export default function FeedbackPage({ user }) {
     } catch {}
   };
 
-  const handleCopy = () => {
-    if (result?.generated_feedback) {
-      navigator.clipboard.writeText(result.generated_feedback);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const handleStartEdit = () => {
+    setOriginalFeedback(result.generated_feedback);
+    setIsEditing(true);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+      }
+    }, 50);
+  };
+
+  const handleSaveEdit = () => {
+    if (editorRef.current) {
+      const text = editorRef.current.innerHTML;
+      setResult((prev) => ({ ...prev, generated_feedback: text, _isHtml: true }));
     }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = originalFeedback;
+    }
+    setIsEditing(false);
+  };
+
+  const execCommand = (command, value = null) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+  };
+
+  const handleCopy = () => {
+    if (!result) return;
+    const text = editorRef.current?.innerText || result.generated_feedback;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleReset = () => {
@@ -264,6 +298,8 @@ export default function FeedbackPage({ user }) {
     setContext("");
     setRatings({});
     setResult(null);
+    setIsEditing(false);
+    setOriginalFeedback("");
   };
 
   return (
@@ -448,13 +484,41 @@ export default function FeedbackPage({ user }) {
                     <h3 className="font-semibold text-text-primary">Generated Feedback</h3>
                     <span className="badge-blue">{FEEDBACK_TYPES.find(t => t.value === result.feedback_type)?.label}</span>
                   </div>
-                  <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-primary hover:bg-panel rounded-lg transition-colors"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                    {copied ? "Copied!" : "Copy"}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {!isEditing ? (
+                      <button
+                        onClick={handleStartEdit}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-primary hover:bg-panel rounded-lg transition-colors"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        Edit
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleSaveEdit}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={handleCopy}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-text-secondary hover:text-primary hover:bg-panel rounded-lg transition-colors"
+                    >
+                      {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -462,13 +526,75 @@ export default function FeedbackPage({ user }) {
                   <span className="badge-green">{TONES.find(t => t.value === result.tone)?.label}</span>
                 </div>
 
-                <div className="prose-sm text-text-primary leading-relaxed whitespace-pre-wrap bg-panel p-5 rounded-xl border border-border-light">
-                  {result.generated_feedback}
-                </div>
+                {isEditing && (
+                  <div className="flex items-center gap-0.5 p-1.5 bg-surface rounded-t-xl border border-b-0 border-border-light flex-wrap">
+                    <button type="button" onClick={() => execCommand("bold")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Bold">
+                      <Bold className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => execCommand("italic")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Italic">
+                      <Italic className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => execCommand("underline")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Underline">
+                      <Underline className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-5 bg-border-light mx-1" />
+                    <button type="button" onClick={() => execCommand("justifyLeft")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Align Left">
+                      <AlignLeft className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => execCommand("justifyCenter")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Align Center">
+                      <AlignCenter className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => execCommand("justifyRight")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Align Right">
+                      <AlignRight className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-5 bg-border-light mx-1" />
+                    <select
+                      onChange={(e) => { if (e.target.value) execCommand("fontSize", e.target.value); }}
+                      defaultValue=""
+                      className="text-xs bg-transparent border border-border-light rounded px-1.5 py-1 text-text-secondary hover:text-text-primary cursor-pointer"
+                      title="Font Size"
+                    >
+                      <option value="" disabled>Size</option>
+                      <option value="1">Small</option>
+                      <option value="3">Normal</option>
+                      <option value="5">Large</option>
+                      <option value="7">Huge</option>
+                    </select>
+                    <div className="w-px h-5 bg-border-light mx-1" />
+                    <button type="button" onClick={() => execCommand("insertHorizontalRule")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Horizontal Line">
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <button type="button" onClick={() => execCommand("removeFormat")} className="p-1.5 rounded hover:bg-panel text-text-secondary hover:text-text-primary transition-colors" title="Clear Formatting">
+                      <Type className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                <div
+                  ref={editorRef}
+                  contentEditable={isEditing}
+                  suppressContentEditableWarning
+                  dangerouslySetInnerHTML={{ __html: result._isHtml ? result.generated_feedback : result.generated_feedback.replace(/\n/g, "<br/>") }}
+                  className={`prose-sm text-text-primary leading-relaxed bg-panel p-5 border border-border-light transition-all ${
+                    isEditing
+                      ? "rounded-b-xl ring-2 ring-primary/30 outline-none min-h-[200px] cursor-text"
+                      : "rounded-xl"
+                  }`}
+                  style={{ whiteSpace: isEditing ? "normal" : "pre-wrap" }}
+                />
 
                 <p className="text-xs text-muted mt-3 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Auto-saved to history
+                  {isEditing ? (
+                    <>
+                      <Edit3 className="w-3 h-3" />
+                      Editing mode — make your changes and click Save
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3 h-3" />
+                      Auto-saved to history
+                    </>
+                  )}
                 </p>
               </div>
             ) : (
