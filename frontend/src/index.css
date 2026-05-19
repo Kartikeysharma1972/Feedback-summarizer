@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-white text-text-primary font-sans antialiased;
+  }
+  ::selection {
+    @apply bg-blue-100 text-primary-dark;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-panel;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-accent;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white border border-border-light rounded-2xl shadow-sm;
+  }
+  .btn-primary {
+    @apply px-6 py-2.5 bg-primary text-white font-medium rounded-xl
+           hover:bg-primary-light active:bg-primary-dark
+           transition-all duration-200 ease-out
+           shadow-sm hover:shadow-md;
+  }
+  .btn-secondary {
+    @apply px-6 py-2.5 bg-panel text-primary font-medium rounded-xl
+           border border-border hover:bg-surface-hover
+           transition-all duration-200 ease-out;
+  }
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-white border border-border rounded-xl
+           text-text-primary placeholder:text-muted
+           focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+           transition-all duration-200;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-blue {
+    @apply badge bg-blue-50 text-primary;
+  }
+  .badge-green {
+    @apply badge bg-emerald-50 text-emerald-700;
+  }
+  .badge-amber {
+    @apply badge bg-amber-50 text-amber-700;
+  }
+  .badge-sky {
+    @apply badge bg-sky-50 text-sky-700;
+  }
+}
