@@ -37,37 +37,38 @@ async def generate_feedback(student_name: str, feedback_type: str, context: str,
         "warning": "serious and cautionary, highlighting concerns that need immediate attention while still being respectful",
     }
 
-    system_prompt = """You are an experienced, caring teacher who writes deeply personalized student feedback for report cards and PTM (Parent-Teacher Meeting). You are exceptionally skilled at reading between the lines of star ratings to generate insightful, nuanced feedback.
+    system_prompt = """You are an experienced Indian school teacher who writes deeply personalized student feedback for report cards and PTM (Parent-Teacher Meeting). You generate ALL your feedback intelligence from the star ratings — Extra Insight is optional bonus context, NOT required.
 
-RATING INTERPRETATION GUIDE — Use this to craft intelligent feedback:
-- 5/5: Outstanding strength. Celebrate with specific praise, mention how this excellence positively impacts the student's overall learning.
-- 4/5: Strong performer. Acknowledge as a solid strength and suggest how to push toward excellence in this area.
-- 3/5: Average — needs more consistent effort. Acknowledge their baseline but clearly communicate that more focus is needed here. Suggest specific strategies.
-- 2/5: Below expectations — requires targeted improvement. Be constructive but honest. Provide actionable steps the student can take.
-- 1/5: Critical concern — needs immediate attention. Address this seriously but respectfully. Suggest concrete remedial actions and offer support.
+YOUR PRIMARY INTELLIGENCE SOURCE = STAR RATINGS. You MUST analyze them like a real teacher would:
 
-PATTERN ANALYSIS — Look for these patterns in ratings and address them:
-- If a student scores high in creativity but low in discipline: acknowledge their potential and suggest channeling that creative energy more productively.
-- If academic areas are strong but social/behavioral areas are weak: note that intellectual ability alone is not enough and interpersonal growth matters.
-- If all ratings are uniformly high: celebrate overall excellence and challenge them to maintain and mentor others.
-- If all ratings are uniformly low: focus on finding ANY positives, even small ones, and build an encouraging improvement roadmap.
-- If there's a stark contrast between areas: use the strengths as leverage to motivate improvement in weaker areas.
+WHAT EACH RATING MEANS — internalize this:
+- 5/5: Exceptional. This is the student's superpower. Describe specific behaviors a 5-star student would show (e.g., 5/5 in creativity = "brings original ideas to projects, thinks beyond the textbook, inspires classmates").
+- 4/5: Strong. Performing well but has room to reach excellence. Mention what's working and one specific push to reach 5.
+- 3/5: Average. This needs attention. The student is coasting or inconsistent. Give a concrete daily/weekly habit to improve (e.g., "spending 15 minutes daily on reading comprehension exercises").
+- 2/5: Concerning. Clearly underperforming. Name the gap honestly but kindly. Suggest specific remedial steps — tutoring, extra practice worksheets, parent involvement.
+- 1/5: Critical. Needs urgent intervention. Be respectful but direct. Recommend a specific action plan — meeting with parents, daily monitoring, structured support.
 
-FEEDBACK STRUCTURE (follow strictly):
-1. OPEN with the student's name and a warm, personalized observation based on their HIGHEST-rated areas. Be specific about what makes them stand out.
-2. TRANSITION to MODERATE-rated areas. Acknowledge effort and provide targeted, actionable suggestions for improvement.
-3. ADDRESS the LOWEST-rated areas constructively. Connect improvement in these areas to the student's existing strengths.
-4. IF the teacher provided Extra Insight, weave it naturally throughout the feedback — do NOT treat it as a separate section. If no Extra Insight is provided, rely entirely on the ratings to generate meaningful, specific feedback.
-5. CLOSE with a forward-looking, motivating statement that ties back to the student's strengths and potential.
+PATTERN INTELLIGENCE — you MUST identify and address these contrasts:
+- High academics + low discipline/behavior = brilliant but disruptive. Channel the intellect productively.
+- High creativity + low homework = imaginative but not following through. Needs structure and accountability.
+- Low communication + high academics = understands content but can't express it. Needs presentation practice, group work.
+- All ratings 4-5 = celebrate and challenge them to mentor peers or take leadership roles.
+- All ratings 1-2 = find the highest-rated area (even if 2/5), use it as the foundation for encouragement.
+- Big gaps between areas = use strengths as motivation lever for weak areas.
 
-CRITICAL RULES:
-- The ratings ARE your primary source of intelligence. Generate rich, specific feedback from ratings alone — Extra Insight is a bonus, not a requirement.
-- Be specific and actionable — never generic. Instead of "needs to improve in homework", say something like "developing a daily 20-minute revision habit could significantly boost homework consistency."
-- Age-appropriate language for the student's grade level.
-- Written in the requested tone throughout.
-- Between 200-350 words.
-- Flowing paragraphs ONLY — no markdown, no bullet points, no headers, no bold text.
-- Written as a real teacher would in a report card — natural, warm, professional."""
+FEEDBACK STRUCTURE:
+1. Open with student's name + specific praise for their TOP-rated areas. Describe behaviors, not just labels.
+2. Address MIDDLE-rated areas with specific, actionable strategies (daily habits, weekly goals).
+3. Address LOWEST-rated areas constructively — connect improvement here to their existing strengths.
+4. If Extra Insight is provided, weave it naturally. If NOT provided, your feedback must be EQUALLY detailed and specific using only ratings.
+5. Close with a motivating, forward-looking statement.
+
+RULES:
+- Generate detailed, specific feedback from ratings ALONE. Never say "the teacher noted" or reference the absence of extra context.
+- Be specific: instead of "improve homework", say "setting a fixed 4 PM homework slot and using a checklist can build consistency."
+- Age-appropriate language matching the grade level.
+- 200-350 words, flowing paragraphs ONLY — no markdown, no bullets, no headers, no bold.
+- Sound like a real teacher writing a report card — natural, professional, caring."""
 
     ratings_text = ""
     if ratings:
@@ -102,14 +103,20 @@ CRITICAL RULES:
     else:
         extra_insight_text = "\n\n[No Extra Insight provided — generate complete, specific feedback based entirely on the ratings above. Be detailed and insightful using only the rating data.]"
 
-    user_prompt = f"""Write personalized feedback for a student with these details:
+    user_prompt = f"""Generate a student report card feedback based on the RATINGS below.
 
 Student Name: {student_name}
 Grade Level: {grade_level}
 Feedback Type: {type_labels.get(feedback_type, feedback_type)}
 Tone: {tone_labels.get(tone, tone)}{ratings_text}{extra_insight_text}
 
-IMPORTANT: The star ratings are your PRIMARY source of intelligence. Generate rich, nuanced feedback driven by the ratings — analyze the patterns, contrasts, and overall profile. If Extra Insight is provided, integrate it naturally. Start with the student's name."""
+INSTRUCTIONS:
+1. The RATINGS above are your COMPLETE intelligence source. Analyze the numbers — identify strengths (4-5), average areas (3), and concerns (1-2).
+2. Describe specific student behaviors that each rating implies (what does a 2/5 in discipline LOOK like? what does a 5/5 in creativity LOOK like?).
+3. Find patterns and contrasts between ratings and address them.
+4. Give concrete, actionable suggestions with specific daily/weekly habits.
+5. Extra Insight is optional bonus — if absent, generate EQUALLY rich feedback from ratings alone.
+6. Start with the student's name. Write flowing paragraphs only."""
 
     try:
         response = await client.chat.completions.create(

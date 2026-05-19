@@ -33,7 +33,7 @@ class FeedbackResponse(BaseModel):
     id: str
     student_name: str
     feedback_type: str
-    context: str
+    context: Optional[str] = None
     tone: str
     grade_level: str
     generated_feedback: str
