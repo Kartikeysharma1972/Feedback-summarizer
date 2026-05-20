@@ -1,4 +1,5 @@
 export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8002";
+export const API_TIMEOUT = 30000;
 
 export const FEEDBACK_TYPES = [
   { value: "academic_performance", label: "Academic Performance" },
