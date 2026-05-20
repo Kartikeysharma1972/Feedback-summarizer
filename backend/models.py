@@ -203,3 +203,21 @@ class ParentReportResponse(BaseModel):
     feedback_count: int
     language: Optional[str] = "english"
     created_at: str
+
+
+class ClassroomInsightsRequest(BaseModel):
+    user_id: str
+    focus_area: str = "overall"
+    grade_filter: Optional[str] = None
+    language: str = "english"
+
+
+class ClassroomInsightsResponse(BaseModel):
+    id: str
+    focus_area: str
+    grade_filter: Optional[str] = None
+    insights_text: str
+    student_count: int
+    feedback_count: int
+    language: Optional[str] = "english"
+    created_at: str

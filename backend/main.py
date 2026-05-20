@@ -17,9 +17,10 @@ from models import (
     SummarizeRequest, SummaryResponse,
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
     ParentReportRequest, ParentReportResponse,
+    ClassroomInsightsRequest, ClassroomInsightsResponse,
 )
 from auth import get_user_by_email, create_user, verify_password
-from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow, transcribe_audio, generate_parent_report, AUDIO_EXTENSIONS
+from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow, transcribe_audio, generate_parent_report, generate_classroom_insights, AUDIO_EXTENSIONS
 from file_parser import extract_text
 
 load_dotenv()
@@ -1019,6 +1020,172 @@ async def standards_coverage(user_id: str, db=Depends(get_db)):
         except Exception:
             pass
     return sorted(code_counts.values(), key=lambda x: x["count"], reverse=True)
+
+
+# ── Classroom Insights ──────────────────────────────────────────
+
+@app.post("/insights/generate", response_model=ClassroomInsightsResponse)
+async def create_classroom_insights(req: ClassroomInsightsRequest, db=Depends(get_db)):
+    user_cursor = await db.execute("SELECT name FROM users WHERE id = ?", (req.user_id,))
+    user_row = await user_cursor.fetchone()
+    if not user_row:
+        raise HTTPException(status_code=404, detail="User not found")
+    teacher_name = user_row[0] if isinstance(user_row, tuple) else user_row["name"]
+
+    grade_clause = ""
+    params = [req.user_id]
+    if req.grade_filter:
+        grade_clause = " AND grade_level = ?"
+        params.append(req.grade_filter)
+
+    fb_cursor = await db.execute(
+        f"""SELECT student_name, grade_level, feedback_type, ratings, sentiment_label,
+                   sentiment_score, glow_grow, created_at
+            FROM feedback_history WHERE user_id = ?{grade_clause} ORDER BY student_name, created_at DESC""",
+        params,
+    )
+    rows = await fb_cursor.fetchall()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No feedback data found to generate insights")
+
+    students_map = {}
+    sentiment_counts = {"positive": 0, "negative": 0, "neutral": 0, "mixed": 0}
+    type_counts = {}
+    grade_set = set()
+    total_sentiment = 0
+    sentiment_n = 0
+
+    for r in rows:
+        name = r[0]
+        grade = r[1]
+        fb_type = r[2]
+        grade_set.add(grade)
+        type_counts[fb_type] = type_counts.get(fb_type, 0) + 1
+
+        if r[4]:
+            sentiment_counts[r[4]] = sentiment_counts.get(r[4], 0) + 1
+        if r[5] is not None:
+            total_sentiment += r[5]
+            sentiment_n += 1
+
+        if name not in students_map:
+            students_map[name] = {
+                "name": name,
+                "grade_level": grade,
+                "feedback_count": 0,
+                "sentiment_scores": [],
+                "all_ratings": {},
+                "glows": [],
+                "grows": [],
+            }
+
+        s = students_map[name]
+        s["feedback_count"] += 1
+        if r[5] is not None:
+            s["sentiment_scores"].append(r[5])
+
+        try:
+            if r[3]:
+                ratings = json.loads(r[3])
+                for k, v in ratings.items():
+                    if k not in s["all_ratings"]:
+                        s["all_ratings"][k] = []
+                    s["all_ratings"][k].append(v)
+        except Exception:
+            pass
+
+        try:
+            if r[6]:
+                gg = json.loads(r[6])
+                s["glows"].extend(gg.get("glows", [])[:2])
+                s["grows"].extend(gg.get("grows", [])[:2])
+        except Exception:
+            pass
+
+    student_summaries = []
+    for s in students_map.values():
+        avg_ratings = {}
+        for k, vals in s["all_ratings"].items():
+            avg_ratings[k] = sum(vals) / len(vals)
+
+        scores = s["sentiment_scores"]
+        avg_sent = round(sum(scores) / len(scores), 2) if scores else None
+        trend = "N/A"
+        if len(scores) >= 2:
+            first_half = sum(scores[:len(scores)//2]) / (len(scores)//2)
+            second_half = sum(scores[len(scores)//2:]) / (len(scores) - len(scores)//2)
+            diff = second_half - first_half
+            trend = "improving" if diff > 0.1 else "declining" if diff < -0.1 else "stable"
+
+        student_summaries.append({
+            "name": s["name"],
+            "grade_level": s["grade_level"],
+            "feedback_count": s["feedback_count"],
+            "avg_sentiment": avg_sent,
+            "avg_ratings": avg_ratings if avg_ratings else None,
+            "top_glows": list(set(s["glows"]))[:3],
+            "top_grows": list(set(s["grows"]))[:3],
+            "sentiment_trend": trend,
+        })
+
+    top_type = max(type_counts, key=type_counts.get) if type_counts else "N/A"
+    class_stats = {
+        "total_students": len(students_map),
+        "total_feedback": len(rows),
+        "avg_sentiment": round(total_sentiment / sentiment_n, 2) if sentiment_n else "N/A",
+        "sentiment_dist": f"Positive: {sentiment_counts.get('positive', 0)}, Negative: {sentiment_counts.get('negative', 0)}, Neutral: {sentiment_counts.get('neutral', 0)}, Mixed: {sentiment_counts.get('mixed', 0)}",
+        "top_feedback_type": top_type,
+        "grade_levels": ", ".join(sorted(grade_set)),
+    }
+
+    try:
+        insights_text = await generate_classroom_insights(
+            teacher_name, req.focus_area, student_summaries, class_stats, req.language,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    insight_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    await db.execute(
+        """INSERT INTO classroom_insights
+           (id, user_id, focus_area, grade_filter, insights_text, student_count, feedback_count, language, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (insight_id, req.user_id, req.focus_area, req.grade_filter,
+         insights_text, len(students_map), len(rows), req.language, now),
+    )
+    await db.commit()
+
+    return ClassroomInsightsResponse(
+        id=insight_id, focus_area=req.focus_area, grade_filter=req.grade_filter,
+        insights_text=insights_text, student_count=len(students_map),
+        feedback_count=len(rows), language=req.language, created_at=now,
+    )
+
+
+@app.get("/insights/history")
+async def get_insights_history(user_id: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT * FROM classroom_insights WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        ClassroomInsightsResponse(
+            id=r[0], focus_area=r[2], grade_filter=r[3],
+            insights_text=r[4], student_count=r[5],
+            feedback_count=r[6], language=r[7] or "english", created_at=r[8],
+        )
+        for r in rows
+    ]
+
+
+@app.delete("/insights/history/{insight_id}")
+async def delete_insight(insight_id: str, db=Depends(get_db)):
+    await db.execute("DELETE FROM classroom_insights WHERE id = ?", (insight_id,))
+    await db.commit()
+    return {"status": "deleted"}
 
 
 if __name__ == "__main__":

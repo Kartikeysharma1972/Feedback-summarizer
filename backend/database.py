@@ -120,6 +120,20 @@ async def init_db():
             )
         """)
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS classroom_insights (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                focus_area TEXT NOT NULL DEFAULT 'overall',
+                grade_filter TEXT,
+                insights_text TEXT NOT NULL,
+                student_count INTEGER NOT NULL DEFAULT 0,
+                feedback_count INTEGER NOT NULL DEFAULT 0,
+                language TEXT DEFAULT 'english',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS student_share_tokens (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,

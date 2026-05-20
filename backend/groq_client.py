@@ -321,6 +321,85 @@ Compile all the above into a single cohesive parent report."""
         raise Exception(f"Failed to generate parent report: {str(e)}")
 
 
+async def generate_classroom_insights(teacher_name: str, focus_area: str, student_summaries: list, class_stats: dict, language: str = "english") -> str:
+    client = _get_client()
+
+    focus_labels = {
+        "overall": "Overall Classroom Analysis — comprehensive review of all aspects",
+        "academic": "Academic Performance Focus — deep dive into grades, ratings, and learning outcomes",
+        "behavioral": "Behavioral & Social Focus — discipline, participation, and social dynamics",
+        "at_risk": "At-Risk Student Identification — students needing immediate attention and intervention",
+        "strengths": "Classroom Strengths & Celebrations — what the class is doing well",
+    }
+
+    students_text = ""
+    for i, s in enumerate(student_summaries[:30], 1):
+        students_text += f"\n--- Student #{i}: {s['name']} (Grade: {s['grade_level']}) ---\n"
+        students_text += f"Feedback count: {s['feedback_count']} | Avg sentiment: {s.get('avg_sentiment', 'N/A')}\n"
+        if s.get('avg_ratings'):
+            ratings_str = ", ".join(f"{k}: {v:.1f}/5" for k, v in s['avg_ratings'].items())
+            students_text += f"Avg ratings: {ratings_str}\n"
+        if s.get('top_glows'):
+            students_text += f"Recurring strengths: {'; '.join(s['top_glows'][:3])}\n"
+        if s.get('top_grows'):
+            students_text += f"Recurring growth areas: {'; '.join(s['top_grows'][:3])}\n"
+        if s.get('sentiment_trend'):
+            students_text += f"Sentiment trend: {s['sentiment_trend']}\n"
+
+    lang_instruction = f"\n\nIMPORTANT: Write the ENTIRE report in {language.capitalize()}. Use natural, fluent phrasing." if language != "english" else ""
+
+    system_prompt = f"""You are an experienced Indian school teacher and academic coordinator writing a classroom-wide insights report. You analyze patterns across ALL students to give {teacher_name} actionable intelligence about their classroom.
+
+REPORT FOCUS: {focus_labels.get(focus_area, focus_labels['overall'])}
+
+STRUCTURE:
+1. Opening: Brief overview — how many students, how many feedback entries, overall classroom health.
+2. Classroom Strengths: What the class collectively does well. Identify the top 2-3 areas where most students score highly.
+3. Classroom Challenges: Common weak areas across multiple students. Be specific about which skills/behaviors need attention.
+4. Student Clusters: Group students by performance patterns (high performers, steady middle, needs support). Name specific students in each group.
+5. At-Risk Alerts: Students showing concerning patterns — low ratings, negative sentiment trends, declining performance. Be direct but compassionate.
+6. Bright Spots: Students showing notable improvement or exceptional strength in specific areas. Celebrate them.
+7. Actionable Recommendations: 5-7 specific, practical strategies {teacher_name} can implement this week/month. These should be classroom-level interventions, not individual student plans.
+8. Data Summary: A brief statistical summary — class average ratings, sentiment distribution, most/least common feedback types.
+
+RULES:
+- Synthesize across ALL students — this is about classroom patterns, not individual report cards.
+- Name specific students when discussing clusters, at-risk cases, and bright spots.
+- Be specific: "3 out of 8 students scored below 2/5 in homework completion" is better than "some students struggle with homework."
+- Professional but warm tone suitable for internal teacher use.
+- 500-800 words, flowing paragraphs. Use short headers for sections.
+- Never mention "AI", "generated", or "data entries" — write as if you personally analyzed the classroom.{lang_instruction}"""
+
+    user_prompt = f"""Generate a {focus_labels.get(focus_area, 'classroom insights')} report for {teacher_name}'s classroom.
+
+CLASS STATISTICS:
+- Total students: {class_stats.get('total_students', 0)}
+- Total feedback entries: {class_stats.get('total_feedback', 0)}
+- Overall avg sentiment score: {class_stats.get('avg_sentiment', 'N/A')}
+- Sentiment distribution: {class_stats.get('sentiment_dist', 'N/A')}
+- Most common feedback type: {class_stats.get('top_feedback_type', 'N/A')}
+- Grade levels covered: {class_stats.get('grade_levels', 'N/A')}
+
+STUDENT-BY-STUDENT DATA:
+{students_text}
+
+Analyze all the above data and generate comprehensive classroom insights."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.6,
+            max_tokens=2000,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        raise Exception(f"Failed to generate classroom insights: {str(e)}")
+
+
 async def generate_mindmap_markdown(text: str, document_type: str) -> str:
     client = _get_client()
 
