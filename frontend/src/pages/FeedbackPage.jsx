@@ -4,10 +4,10 @@ import {
   PenTool, Send, Copy, Check, RefreshCw, Sparkles,
   User, BookOpen, MessageSquare, Heart, Star, Download,
   Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus,
-  ClipboardList, ChevronDown, ChevronUp,
+  ClipboardList, ChevronDown, ChevronUp, Target,
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
-import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE } from "../utils/constants";
+import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE, STANDARD_FRAMEWORKS } from "../utils/constants";
 
 function StarRating({ value, onChange, label }) {
   const [hover, setHover] = useState(0);
@@ -304,6 +304,8 @@ export default function FeedbackPage({ user }) {
   const [rubrics, setRubrics] = useState([]);
   const [selectedRubricId, setSelectedRubricId] = useState("");
   const [rubricScores, setRubricScores] = useState({});
+  const [selectedFramework, setSelectedFramework] = useState("");
+  const [selectedStandards, setSelectedStandards] = useState([]);
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -341,6 +343,7 @@ export default function FeedbackPage({ user }) {
           ratings: Object.keys(ratings).length > 0 ? ratings : null,
           rubric_id: selectedRubricId || null,
           rubric_scores: selectedRubricId && Object.keys(rubricScores).length > 0 ? rubricScores : null,
+          standards: selectedStandards.length > 0 ? selectedStandards : null,
         }),
       });
       setResult(data);
@@ -394,6 +397,8 @@ export default function FeedbackPage({ user }) {
     setRatings({});
     setSelectedRubricId("");
     setRubricScores({});
+    setSelectedFramework("");
+    setSelectedStandards([]);
     setResult(null);
     setIsEditing(false);
     setOriginalFeedback("");
@@ -525,6 +530,69 @@ export default function FeedbackPage({ user }) {
                 )}
               </div>
             )}
+
+            {/* Standards Alignment */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <Target className="w-3.5 h-3.5 inline mr-1.5" />
+                Standards Alignment
+                <span className="text-xs text-muted ml-1.5 font-normal">(Optional)</span>
+              </label>
+              <select
+                value={selectedFramework}
+                onChange={(e) => {
+                  setSelectedFramework(e.target.value);
+                  setSelectedStandards([]);
+                }}
+                className="input-field mb-2"
+              >
+                <option value="">No standards — skip alignment</option>
+                {STANDARD_FRAMEWORKS.map((fw) => (
+                  <option key={fw.id} value={fw.id}>{fw.name}</option>
+                ))}
+              </select>
+
+              {selectedFramework && (
+                <div className="bg-panel rounded-xl p-3 border border-border-light space-y-1.5 max-h-48 overflow-y-auto">
+                  {STANDARD_FRAMEWORKS.find((fw) => fw.id === selectedFramework)?.standards.map((std) => {
+                    const isSelected = selectedStandards.some((s) => s.code === std.code);
+                    return (
+                      <label
+                        key={std.code}
+                        className={`flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors ${
+                          isSelected ? "bg-primary/5 border border-primary/20" : "hover:bg-surface-hover border border-transparent"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setSelectedStandards((prev) => prev.filter((s) => s.code !== std.code));
+                            } else {
+                              setSelectedStandards((prev) => [...prev, { code: std.code, name: std.name, description: std.description }]);
+                            }
+                          }}
+                          className="mt-0.5 rounded border-border text-primary focus:ring-primary/30"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">{std.code}</span>
+                            <span className="text-sm font-medium text-text-primary">{std.name}</span>
+                          </div>
+                          <p className="text-xs text-muted mt-0.5">{std.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedStandards.length > 0 && (
+                <p className="text-xs text-primary mt-1.5 font-medium">
+                  {selectedStandards.length} standard{selectedStandards.length > 1 ? "s" : ""} selected
+                </p>
+              )}
+            </div>
 
             {/* Tone */}
             <div>
@@ -670,6 +738,11 @@ export default function FeedbackPage({ user }) {
                       {result.sentiment_score != null && ` (${Math.round(result.sentiment_score * 100)}%)`}
                     </span>
                   )}
+                  {result.standards?.map((s) => (
+                    <span key={s.code} className="badge bg-violet-50 text-violet-700 border border-violet-200">
+                      {s.code}
+                    </span>
+                  ))}
                 </div>
 
                 {isEditing && (

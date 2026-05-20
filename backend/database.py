@@ -63,6 +63,7 @@ async def init_db():
         for col, col_type in [
             ("rubric_id", "TEXT"),
             ("rubric_scores", "TEXT"),
+            ("standards_tags", "TEXT"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE feedback_history ADD COLUMN {col} {col_type}")

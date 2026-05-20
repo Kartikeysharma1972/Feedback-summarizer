@@ -41,7 +41,7 @@ Return ONLY valid JSON, no other text."""
         return {"label": "neutral", "score": 0.5, "breakdown": {"positive": 33, "negative": 33, "neutral": 34}, "keywords": []}
 
 
-async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None, rubric_data: dict = None) -> str:
+async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None, rubric_data: dict = None, standards: list = None) -> str:
     client = _get_client()
 
     type_labels = {
@@ -100,7 +100,9 @@ RULES:
 - 200-350 words, flowing paragraphs ONLY — no markdown, no bullets, no headers, no bold.
 - Sound like a real teacher writing a report card — natural, professional, caring.
 
-If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and level descriptions to generate more specific, criterion-aligned feedback. Reference the rubric criteria by name in your feedback. The rubric assessment takes priority over generic star ratings when both are present."""
+If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and level descriptions to generate more specific, criterion-aligned feedback. Reference the rubric criteria by name in your feedback. The rubric assessment takes priority over generic star ratings when both are present.
+
+If EDUCATIONAL STANDARDS are provided, explicitly reference the relevant standards in your feedback. Explain how the student's performance aligns with each selected standard — where they meet or exceed the standard, and where they need growth. Use the standard names naturally in the feedback text (e.g., "In terms of Reading Comprehension, Arjun demonstrates..."). This helps parents and administrators understand how the student is progressing against curriculum benchmarks."""
 
     ratings_text = ""
     if ratings:
@@ -148,6 +150,14 @@ If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and leve
                     rubric_text += "\n"
                 rubric_text += "\n"
 
+    standards_text = ""
+    if standards:
+        standards_text = "\n\nEDUCATIONAL STANDARDS ALIGNMENT:\n"
+        standards_text += "The teacher has selected the following standards to align this feedback with:\n"
+        for s in standards:
+            standards_text += f"  - {s.get('code', '')}: {s.get('name', '')} — {s.get('description', '')}\n"
+        standards_text += "\nReference each standard by name in the feedback. Explain how the student's performance relates to each standard."
+
     extra_insight_text = ""
     if context and context.strip():
         extra_insight_text = f"\n\nTeacher's Extra Insight (weave this naturally into the feedback — do NOT treat as a separate section):\n{context}"
@@ -159,7 +169,7 @@ If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and leve
 Student Name: {student_name}
 Grade Level: {grade_level}
 Feedback Type: {type_labels.get(feedback_type, feedback_type)}
-Tone: {tone_labels.get(tone, tone)}{ratings_text}{rubric_text}{extra_insight_text}
+Tone: {tone_labels.get(tone, tone)}{ratings_text}{rubric_text}{standards_text}{extra_insight_text}
 
 INSTRUCTIONS:
 1. The RATINGS above are your COMPLETE intelligence source. Analyze the numbers — identify strengths (4-5), average areas (3), and concerns (1-2).

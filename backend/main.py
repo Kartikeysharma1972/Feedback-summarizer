@@ -116,7 +116,7 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
     try:
         feedback_text = await generate_feedback(
             req.student_name, req.feedback_type, req.context or "", req.tone, req.grade_level,
-            req.ratings, rubric_data,
+            req.ratings, rubric_data, req.standards,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -127,18 +127,19 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
     now = datetime.now(timezone.utc).isoformat()
     ratings_json = json.dumps(req.ratings) if req.ratings else None
     rubric_scores_json = json.dumps(req.rubric_scores) if req.rubric_scores else None
+    standards_json = json.dumps(req.standards) if req.standards else None
 
     await db.execute(
         """INSERT INTO feedback_history
            (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
             sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-            rubric_id, rubric_scores, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rubric_id, rubric_scores, standards_tags, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (feedback_id, req.user_id, req.student_name, req.feedback_type,
          req.context or "", feedback_text, req.tone, req.grade_level, ratings_json,
          sentiment.get("label"), sentiment.get("score"),
          json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-         req.rubric_id, rubric_scores_json, now),
+         req.rubric_id, rubric_scores_json, standards_json, now),
     )
     await db.commit()
 
@@ -149,6 +150,7 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
         sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
         sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
         rubric_id=req.rubric_id, rubric_scores=req.rubric_scores,
+        standards=req.standards,
         created_at=now,
     )
 
@@ -158,7 +160,7 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
     cursor = await db.execute(
         """SELECT id, user_id, student_name, feedback_type, context, generated_feedback,
                   tone, grade_level, ratings, sentiment_label, sentiment_score,
-                  sentiment_breakdown, sentiment_keywords, created_at
+                  sentiment_breakdown, sentiment_keywords, standards_tags, created_at
            FROM feedback_history WHERE user_id = ? ORDER BY created_at DESC""",
         (user_id,),
     )
@@ -168,6 +170,7 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
         ratings_data = None
         sentiment_bd = None
         sentiment_kw = None
+        standards_data = None
         try:
             if r[8]:
                 ratings_data = json.loads(r[8])
@@ -183,12 +186,18 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
                 sentiment_kw = json.loads(r[12])
         except Exception:
             pass
+        try:
+            if r[13]:
+                standards_data = json.loads(r[13])
+        except Exception:
+            pass
         results.append(FeedbackResponse(
             id=r[0], student_name=r[2], feedback_type=r[3], context=r[4],
             generated_feedback=r[5], tone=r[6], grade_level=r[7],
             ratings=ratings_data, sentiment_label=r[9], sentiment_score=r[10],
             sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
-            created_at=r[13],
+            standards=standards_data,
+            created_at=r[14],
         ))
     return results
 
@@ -221,6 +230,7 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
         s_context = (student.get("context") if isinstance(student, dict) else student.context) or ""
         s_ratings = student.get("ratings") if isinstance(student, dict) else student.ratings
         s_rubric_scores = student.get("rubric_scores") if isinstance(student, dict) else student.rubric_scores
+        s_standards = (student.get("standards") if isinstance(student, dict) else student.standards) or req.standards
 
         rubric_data = None
         if rubric_data_template and rubric_criteria_rows and s_rubric_scores:
@@ -252,7 +262,7 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
         try:
             feedback_text = await generate_feedback(
                 s_name, req.feedback_type, s_context, req.tone, req.grade_level,
-                s_ratings, rubric_data,
+                s_ratings, rubric_data, s_standards,
             )
             sentiment = await analyze_sentiment(feedback_text)
 
@@ -260,18 +270,19 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
             now = datetime.now(timezone.utc).isoformat()
             ratings_json = json.dumps(s_ratings) if s_ratings else None
             rubric_scores_json = json.dumps(s_rubric_scores) if s_rubric_scores else None
+            standards_json = json.dumps(s_standards) if s_standards else None
 
             await db.execute(
                 """INSERT INTO feedback_history
                    (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
                     sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-                    rubric_id, rubric_scores, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    rubric_id, rubric_scores, standards_tags, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (feedback_id, req.user_id, s_name, req.feedback_type,
                  s_context, feedback_text, req.tone, req.grade_level, ratings_json,
                  sentiment.get("label"), sentiment.get("score"),
                  json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-                 req.rubric_id, rubric_scores_json, now),
+                 req.rubric_id, rubric_scores_json, standards_json, now),
             )
             await db.commit()
 
@@ -282,6 +293,7 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
                 sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
                 sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
                 rubric_id=req.rubric_id, rubric_scores=s_rubric_scores,
+                standards=s_standards,
                 created_at=now,
             ))
             completed += 1
@@ -621,7 +633,7 @@ async def student_portal(token: str, db=Depends(get_db)):
     fb_cursor = await db.execute(
         """SELECT id, student_name, feedback_type, context, generated_feedback,
                   tone, grade_level, ratings, sentiment_label, sentiment_score,
-                  sentiment_breakdown, sentiment_keywords, created_at
+                  sentiment_breakdown, sentiment_keywords, standards_tags, created_at
            FROM feedback_history WHERE user_id = ? AND student_name = ? ORDER BY created_at DESC""",
         (user_id, student_name),
     )
@@ -634,6 +646,7 @@ async def student_portal(token: str, db=Depends(get_db)):
         ratings_data = None
         sentiment_bd = None
         sentiment_kw = None
+        standards_data = None
         try:
             if r[7]:
                 ratings_data = json.loads(r[7])
@@ -649,6 +662,11 @@ async def student_portal(token: str, db=Depends(get_db)):
                 sentiment_kw = json.loads(r[11])
         except Exception:
             pass
+        try:
+            if r[12]:
+                standards_data = json.loads(r[12])
+        except Exception:
+            pass
 
         if r[9] is not None:
             total_sentiment += r[9]
@@ -659,7 +677,8 @@ async def student_portal(token: str, db=Depends(get_db)):
             generated_feedback=r[4], tone=r[5], grade_level=r[6],
             ratings=ratings_data, sentiment_label=r[8], sentiment_score=r[9],
             sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
-            created_at=r[12],
+            standards=standards_data,
+            created_at=r[13],
         ))
 
     stats = {
@@ -837,6 +856,28 @@ async def top_students(user_id: str, db=Depends(get_db)):
          "avg_sentiment": round(r[3], 2) if r[3] else None}
         for r in rows
     ]
+
+
+@app.get("/analytics/standards-coverage")
+async def standards_coverage(user_id: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT standards_tags FROM feedback_history WHERE user_id = ? AND standards_tags IS NOT NULL",
+        (user_id,))
+    rows = await cursor.fetchall()
+    code_counts = {}
+    for row in rows:
+        try:
+            tags = json.loads(row[0])
+            for tag in tags:
+                code = tag.get("code", "")
+                name = tag.get("name", code)
+                if code:
+                    if code not in code_counts:
+                        code_counts[code] = {"code": code, "name": name, "count": 0}
+                    code_counts[code]["count"] += 1
+        except Exception:
+            pass
+    return sorted(code_counts.values(), key=lambda x: x["count"], reverse=True)
 
 
 if __name__ == "__main__":

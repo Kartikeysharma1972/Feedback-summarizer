@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, Search, PenTool, FileText, Trash2, Copy, Check,
-  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2
+  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2, Target
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
 import { FEEDBACK_TYPES, TONES, DOCUMENT_TYPES, SUMMARY_LENGTHS } from "../utils/constants";
@@ -223,6 +223,12 @@ export default function HistoryPage({ user }) {
                           {item.sentiment_label}
                         </span>
                       )}
+                      {tab === "feedback" && item.standards?.length > 0 && (
+                        <span className="badge text-xs bg-violet-50 text-violet-700 flex items-center gap-1">
+                          <Target className="w-3 h-3" />
+                          {item.standards.length} standard{item.standards.length > 1 ? "s" : ""}
+                        </span>
+                      )}
                       {tab === "summary" && (
                         <span className="badge-amber text-xs">{getLabel(SUMMARY_LENGTHS, item.summary_length)}</span>
                       )}
@@ -249,6 +255,16 @@ export default function HistoryPage({ user }) {
                       className="overflow-hidden"
                     >
                       <div className="px-4 pb-4 border-t border-border-light pt-4">
+                        {tab === "feedback" && item.standards?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {item.standards.map((s) => (
+                              <span key={s.code} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-violet-50 text-violet-700 border border-violet-200">
+                                <Target className="w-3 h-3" />
+                                {s.code}: {s.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <div className="bg-panel p-4 rounded-xl text-sm text-text-primary whitespace-pre-wrap leading-relaxed mb-3">
                           {tab === "feedback" ? item.generated_feedback : item.summary}
                         </div>

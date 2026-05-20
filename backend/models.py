@@ -29,6 +29,7 @@ class FeedbackRequest(BaseModel):
     ratings: Optional[dict] = None  # {"academic_performance": 4, "behavior": 3, ...}
     rubric_id: Optional[str] = None
     rubric_scores: Optional[dict] = None  # {"criterion_id": 4, ...}
+    standards: Optional[list] = None  # [{"code": "CBSE-ENG-R", "name": "Reading Comprehension"}, ...]
 
 
 class FeedbackResponse(BaseModel):
@@ -46,6 +47,7 @@ class FeedbackResponse(BaseModel):
     sentiment_keywords: Optional[list] = None
     rubric_id: Optional[str] = None
     rubric_scores: Optional[dict] = None
+    standards: Optional[list] = None
     created_at: str
 
 
@@ -115,6 +117,7 @@ class BatchStudentEntry(BaseModel):
     context: Optional[str] = None
     ratings: Optional[dict] = None
     rubric_scores: Optional[dict] = None
+    standards: Optional[list] = None
 
 
 class BatchFeedbackRequest(BaseModel):
@@ -123,6 +126,7 @@ class BatchFeedbackRequest(BaseModel):
     tone: str
     grade_level: str
     rubric_id: Optional[str] = None
+    standards: Optional[list] = None
     students: list  # list of BatchStudentEntry
 
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, Users, FileText, PenTool, Star,
-  Heart, Activity, Award, ArrowUp, ArrowDown, Minus
+  Heart, Activity, Award, ArrowUp, ArrowDown, Minus, Target
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -95,12 +95,13 @@ export default function AnalyticsPage({ user }) {
   const [gradeDist, setGradeDist] = useState([]);
   const [typeDist, setTypeDist] = useState([]);
   const [topStudents, setTopStudents] = useState([]);
+  const [standardsCoverage, setStandardsCoverage] = useState([]);
   const { loading, execute } = useApi();
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [ov, sd, rd, act, gd, td, ts] = await Promise.all([
+        const [ov, sd, rd, act, gd, td, ts, sc] = await Promise.all([
           execute(`/analytics/overview?user_id=${user.id}`),
           execute(`/analytics/sentiment-distribution?user_id=${user.id}`),
           execute(`/analytics/rating-distribution?user_id=${user.id}`),
@@ -108,6 +109,7 @@ export default function AnalyticsPage({ user }) {
           execute(`/analytics/grade-distribution?user_id=${user.id}`),
           execute(`/analytics/feedback-type-distribution?user_id=${user.id}`),
           execute(`/analytics/top-students?user_id=${user.id}`),
+          execute(`/analytics/standards-coverage?user_id=${user.id}`),
         ]);
         setOverview(ov);
         setSentimentDist(sd);
@@ -116,6 +118,7 @@ export default function AnalyticsPage({ user }) {
         setGradeDist(gd);
         setTypeDist(td);
         setTopStudents(ts);
+        setStandardsCoverage(sc);
       } catch {}
     };
     fetchAll();
@@ -358,6 +361,30 @@ export default function AnalyticsPage({ user }) {
               <p className="text-sm text-muted text-center py-8">No student data yet</p>
             )}
           </ChartCard>
+
+          {/* Standards Coverage */}
+          {standardsCoverage.length > 0 && (
+            <ChartCard title="Standards Coverage" icon={Target} className="mt-4">
+              <ResponsiveContainer width="100%" height={Math.max(200, standardsCoverage.length * 40)}>
+                <BarChart data={standardsCoverage} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0f2fe" />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: "#475569" }}
+                    width={160}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="count" name="Times Used" radius={[0, 6, 6, 0]}>
+                    {standardsCoverage.map((_, i) => (
+                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          )}
         </>
       )}
     </div>
