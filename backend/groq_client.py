@@ -1,4 +1,5 @@
 import os
+import json
 from groq import AsyncGroq
 
 _client = None
@@ -11,7 +12,36 @@ def _get_client():
     return _client
 
 
-async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None) -> str:
+async def analyze_sentiment(text: str) -> dict:
+    client = _get_client()
+
+    system_prompt = """You are a sentiment analysis expert for educational feedback. Analyze the given text and return a JSON object with:
+- "label": one of "positive", "negative", "neutral", or "mixed"
+- "score": confidence score from 0.0 to 1.0
+- "breakdown": {"positive": 0-100, "negative": 0-100, "neutral": 0-100} (must sum to 100)
+- "keywords": list of 3-5 key emotion/sentiment words found in the text
+
+Return ONLY valid JSON, no other text."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Analyze the sentiment of this educational feedback:\n\n{text[:3000]}"},
+            ],
+            temperature=0.1,
+            max_tokens=300,
+        )
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except Exception:
+        return {"label": "neutral", "score": 0.5, "breakdown": {"positive": 33, "negative": 33, "neutral": 34}, "keywords": []}
+
+
+async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None, rubric_data: dict = None) -> str:
     client = _get_client()
 
     type_labels = {
@@ -68,7 +98,9 @@ RULES:
 - Be specific: instead of "improve homework", say "setting a fixed 4 PM homework slot and using a checklist can build consistency."
 - Age-appropriate language matching the grade level.
 - 200-350 words, flowing paragraphs ONLY — no markdown, no bullets, no headers, no bold.
-- Sound like a real teacher writing a report card — natural, professional, caring."""
+- Sound like a real teacher writing a report card — natural, professional, caring.
+
+If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and level descriptions to generate more specific, criterion-aligned feedback. Reference the rubric criteria by name in your feedback. The rubric assessment takes priority over generic star ratings when both are present."""
 
     ratings_text = ""
     if ratings:
@@ -97,6 +129,25 @@ RULES:
 
         ratings_text = "\n\nTeacher's Star Ratings (use these as your PRIMARY intelligence source):\n" + "\n\n".join(sections)
 
+    rubric_text = ""
+    if rubric_data:
+        rubric_text = f"\n\nRUBRIC-BASED ASSESSMENT — '{rubric_data['name']}':\n"
+        rubric_text += "The teacher scored the student using a custom rubric. Each criterion has 5 levels (1=Beginning to 5=Exemplary).\n\n"
+
+        high_criteria = [c for c in rubric_data["criteria"] if c["score"] >= 4]
+        mid_criteria = [c for c in rubric_data["criteria"] if c["score"] == 3]
+        low_criteria = [c for c in rubric_data["criteria"] if c["score"] <= 2]
+
+        for group_label, group in [("STRONG (4-5)", high_criteria), ("MODERATE (3)", mid_criteria), ("NEEDS IMPROVEMENT (1-2)", low_criteria)]:
+            if group:
+                rubric_text += f"{group_label}:\n"
+                for c in group:
+                    rubric_text += f"  - {c['name']} ({c['score']}/5 = {c['level_label']})"
+                    if c.get('level_description'):
+                        rubric_text += f": {c['level_description'][:100]}"
+                    rubric_text += "\n"
+                rubric_text += "\n"
+
     extra_insight_text = ""
     if context and context.strip():
         extra_insight_text = f"\n\nTeacher's Extra Insight (weave this naturally into the feedback — do NOT treat as a separate section):\n{context}"
@@ -108,7 +159,7 @@ RULES:
 Student Name: {student_name}
 Grade Level: {grade_level}
 Feedback Type: {type_labels.get(feedback_type, feedback_type)}
-Tone: {tone_labels.get(tone, tone)}{ratings_text}{extra_insight_text}
+Tone: {tone_labels.get(tone, tone)}{ratings_text}{rubric_text}{extra_insight_text}
 
 INSTRUCTIONS:
 1. The RATINGS above are your COMPLETE intelligence source. Analyze the numbers — identify strengths (4-5), average areas (3), and concerns (1-2).
@@ -131,6 +182,36 @@ INSTRUCTIONS:
         return response.choices[0].message.content
     except Exception as e:
         raise Exception(f"Failed to generate feedback: {str(e)}")
+
+
+async def generate_mindmap_markdown(text: str, document_type: str) -> str:
+    client = _get_client()
+
+    system_prompt = """You are an expert at creating structured mind maps from documents. Convert the given text into a hierarchical markdown structure suitable for mind map visualization.
+
+RULES:
+- Use markdown headings (# ## ###) for hierarchy levels
+- Use bullet points (- ) for leaf nodes
+- Maximum 3 levels of depth
+- Keep each node text short (under 8 words)
+- Extract 4-6 main topics from the document
+- Each main topic should have 2-4 subtopics
+- Focus on key information: dates, actions, people, decisions
+- Output ONLY the markdown structure, no explanations"""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Create a mind map structure for this {document_type}:\n\n{text[:4000]}"},
+            ],
+            temperature=0.3,
+            max_tokens=800,
+        )
+        return response.choices[0].message.content
+    except Exception:
+        return "# Document\n## Key Points\n- No data available"
 
 
 async def summarize_document(text: str, document_type: str, summary_length: str) -> str:

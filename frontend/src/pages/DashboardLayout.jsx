@@ -3,12 +3,14 @@ import { NavLink, Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap, PenTool, FileText, Clock, LogOut,
-  Menu, X, ChevronRight
+  Menu, X, ChevronRight, BarChart3, ClipboardList
 } from "lucide-react";
 
 const navItems = [
   { to: "/dashboard/feedback", label: "Feedback Generator", icon: PenTool },
+  { to: "/dashboard/rubrics", label: "Rubric Templates", icon: ClipboardList },
   { to: "/dashboard/summarizer", label: "Document Summarizer", icon: FileText },
+  { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/dashboard/history", label: "History", icon: Clock },
 ];
 

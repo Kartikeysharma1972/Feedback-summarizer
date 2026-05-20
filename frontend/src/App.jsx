@@ -6,7 +6,9 @@ import AuthPage from "./pages/AuthPage";
 import DashboardLayout from "./pages/DashboardLayout";
 import FeedbackPage from "./pages/FeedbackPage";
 import SummarizerPage from "./pages/SummarizerPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import HistoryPage from "./pages/HistoryPage";
+import RubricPage from "./pages/RubricPage";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -44,6 +46,8 @@ function App() {
           <Route index element={<Navigate to="feedback" />} />
           <Route path="feedback" element={<FeedbackPage user={user} />} />
           <Route path="summarizer" element={<SummarizerPage user={user} />} />
+          <Route path="rubrics" element={<RubricPage user={user} />} />
+          <Route path="analytics" element={<AnalyticsPage user={user} />} />
           <Route path="history" element={<HistoryPage user={user} />} />
         </Route>
         <Route path="*" element={<Navigate to="/" />} />

@@ -196,6 +196,16 @@ export default function HistoryPage({ user }) {
                       {tab === "feedback" && (
                         <span className="badge-green text-xs">{getLabel(TONES, item.tone)}</span>
                       )}
+                      {tab === "feedback" && item.sentiment_label && (
+                        <span className={`badge text-xs ${
+                          item.sentiment_label === "positive" ? "bg-emerald-50 text-emerald-700" :
+                          item.sentiment_label === "negative" ? "bg-red-50 text-red-700" :
+                          item.sentiment_label === "mixed" ? "bg-amber-50 text-amber-700" :
+                          "bg-slate-50 text-slate-600"
+                        }`}>
+                          {item.sentiment_label}
+                        </span>
+                      )}
                       {tab === "summary" && (
                         <span className="badge-amber text-xs">{getLabel(SUMMARY_LENGTHS, item.summary_length)}</span>
                       )}

@@ -30,11 +30,18 @@ async def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-        # Add ratings column to existing tables (safe migration)
-        try:
-            await db.execute("ALTER TABLE feedback_history ADD COLUMN ratings TEXT")
-        except Exception:
-            pass  # Column already exists
+        # Safe migrations for new columns
+        for col, col_type in [
+            ("ratings", "TEXT"),
+            ("sentiment_label", "TEXT"),
+            ("sentiment_score", "REAL"),
+            ("sentiment_breakdown", "TEXT"),
+            ("sentiment_keywords", "TEXT"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE feedback_history ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS summary_history (
                 id TEXT PRIMARY KEY,
@@ -46,6 +53,53 @@ async def init_db():
                 summary_length TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        try:
+            await db.execute("ALTER TABLE summary_history ADD COLUMN mindmap_markdown TEXT")
+        except Exception:
+            pass
+
+        for col, col_type in [
+            ("rubric_id", "TEXT"),
+            ("rubric_scores", "TEXT"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE feedback_history ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS rubric_templates (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                subject TEXT,
+                grade_level TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS rubric_criteria (
+                id TEXT PRIMARY KEY,
+                rubric_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                level_1_label TEXT NOT NULL DEFAULT 'Beginning',
+                level_1_description TEXT,
+                level_2_label TEXT NOT NULL DEFAULT 'Developing',
+                level_2_description TEXT,
+                level_3_label TEXT NOT NULL DEFAULT 'Proficient',
+                level_3_description TEXT,
+                level_4_label TEXT NOT NULL DEFAULT 'Advanced',
+                level_4_description TEXT,
+                level_5_label TEXT NOT NULL DEFAULT 'Exemplary',
+                level_5_description TEXT,
+                FOREIGN KEY (rubric_id) REFERENCES rubric_templates(id)
             )
         """)
         await db.commit()

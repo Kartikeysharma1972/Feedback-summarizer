@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   PenTool, Send, Copy, Check, RefreshCw, Sparkles,
   User, BookOpen, MessageSquare, Heart, Star, Download,
-  Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus
+  Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus,
+  ClipboardList, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
-import { FEEDBACK_TYPES, TONES, GRADE_LEVELS } from "../utils/constants";
+import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE } from "../utils/constants";
 
 function StarRating({ value, onChange, label }) {
   const [hover, setHover] = useState(0);
@@ -33,6 +34,85 @@ function StarRating({ value, onChange, label }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function RubricScorer({ rubric, scores, onScoresChange }) {
+  const [expanded, setExpanded] = useState(true);
+
+  if (!rubric) return null;
+
+  return (
+    <div className="bg-panel rounded-xl border border-border-light overflow-hidden">
+      <div
+        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium text-text-primary">{rubric.name}</span>
+          <span className="text-xs text-muted">({rubric.criteria?.length} criteria)</span>
+        </div>
+        {expanded ? <ChevronUp className="w-4 h-4 text-muted" /> : <ChevronDown className="w-4 h-4 text-muted" />}
+      </div>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border-light pt-3">
+          {rubric.criteria?.map((criterion) => {
+            const currentScore = scores[criterion.id] || 0;
+            return (
+              <div key={criterion.id} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-text-primary">{criterion.name}</span>
+                  {currentScore > 0 && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      currentScore <= 2 ? "bg-red-100 text-red-600" :
+                      currentScore === 3 ? "bg-amber-100 text-amber-600" :
+                      "bg-emerald-100 text-emerald-600"
+                    }`}>
+                      {criterion[`level_${currentScore}_label`] || `Level ${currentScore}`}
+                    </span>
+                  )}
+                </div>
+                {criterion.description && (
+                  <p className="text-xs text-muted">{criterion.description}</p>
+                )}
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map((level) => {
+                    const label = criterion[`level_${level}_label`] || `Level ${level}`;
+                    const desc = criterion[`level_${level}_description`];
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => {
+                          onScoresChange({ ...scores, [criterion.id]: level });
+                        }}
+                        title={desc ? `${label}: ${desc}` : label}
+                        className={`flex-1 py-2 px-1 rounded-lg text-xs font-medium transition-all border ${
+                          currentScore === level
+                            ? level <= 2
+                              ? "bg-red-500 text-white border-red-500 shadow-sm"
+                              : level === 3
+                              ? "bg-amber-500 text-white border-amber-500 shadow-sm"
+                              : "bg-emerald-500 text-white border-emerald-500 shadow-sm"
+                            : "bg-white text-text-secondary border-border-light hover:border-primary/30 hover:text-primary"
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="font-bold">{level}</div>
+                          <div className="truncate hidden sm:block" style={{ fontSize: "10px" }}>{label}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -221,12 +301,25 @@ export default function FeedbackPage({ user }) {
   const [tone, setTone] = useState("encouraging");
   const [context, setContext] = useState("");
   const [ratings, setRatings] = useState({});
+  const [rubrics, setRubrics] = useState([]);
+  const [selectedRubricId, setSelectedRubricId] = useState("");
+  const [rubricScores, setRubricScores] = useState({});
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [originalFeedback, setOriginalFeedback] = useState("");
   const editorRef = useRef(null);
   const { loading, error, execute, setError } = useApi();
+
+  useEffect(() => {
+    async function fetchRubrics() {
+      try {
+        const res = await fetch(`${API_BASE}/rubrics?user_id=${user.id}`);
+        if (res.ok) setRubrics(await res.json());
+      } catch {}
+    }
+    fetchRubrics();
+  }, [user.id]);
 
   const handleRatingChange = (type, value) => {
     setRatings((prev) => ({ ...prev, [type]: value }));
@@ -246,6 +339,8 @@ export default function FeedbackPage({ user }) {
           grade_level: gradeLevel,
           user_id: user.id,
           ratings: Object.keys(ratings).length > 0 ? ratings : null,
+          rubric_id: selectedRubricId || null,
+          rubric_scores: selectedRubricId && Object.keys(rubricScores).length > 0 ? rubricScores : null,
         }),
       });
       setResult(data);
@@ -297,10 +392,14 @@ export default function FeedbackPage({ user }) {
     setTone("encouraging");
     setContext("");
     setRatings({});
+    setSelectedRubricId("");
+    setRubricScores({});
     setResult(null);
     setIsEditing(false);
     setOriginalFeedback("");
   };
+
+  const selectedRubric = rubrics.find((r) => r.id === selectedRubricId);
 
   return (
     <div>
@@ -392,6 +491,40 @@ export default function FeedbackPage({ user }) {
                 ))}
               </div>
             </div>
+
+            {/* Rubric-Based Grading */}
+            {rubrics.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                  <ClipboardList className="w-3.5 h-3.5 inline mr-1.5" />
+                  Rubric Assessment
+                  <span className="text-xs text-muted ml-1.5 font-normal">(Optional)</span>
+                </label>
+                <select
+                  value={selectedRubricId}
+                  onChange={(e) => {
+                    setSelectedRubricId(e.target.value);
+                    setRubricScores({});
+                  }}
+                  className="input-field mb-2"
+                >
+                  <option value="">No rubric — use star ratings only</option>
+                  {rubrics.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {r.subject ? `(${r.subject})` : ""} {r.grade_level ? `— ${r.grade_level}` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedRubric && (
+                  <RubricScorer
+                    rubric={selectedRubric}
+                    scores={rubricScores}
+                    onScoresChange={setRubricScores}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Tone */}
             <div>
@@ -524,6 +657,19 @@ export default function FeedbackPage({ user }) {
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className="badge-sky">{result.grade_level}</span>
                   <span className="badge-green">{TONES.find(t => t.value === result.tone)?.label}</span>
+                  {result.sentiment_label && (
+                    <span className={`badge ${
+                      result.sentiment_label === "positive" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                      result.sentiment_label === "negative" ? "bg-red-50 text-red-700 border border-red-200" :
+                      result.sentiment_label === "mixed" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                      "bg-slate-50 text-slate-600 border border-slate-200"
+                    }`}>
+                      {result.sentiment_label === "positive" ? "Positive Sentiment" :
+                       result.sentiment_label === "negative" ? "Negative Sentiment" :
+                       result.sentiment_label === "mixed" ? "Mixed Sentiment" : "Neutral Sentiment"}
+                      {result.sentiment_score != null && ` (${Math.round(result.sentiment_score * 100)}%)`}
+                    </span>
+                  )}
                 </div>
 
                 {isEditing && (

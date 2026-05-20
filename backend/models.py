@@ -27,6 +27,8 @@ class FeedbackRequest(BaseModel):
     grade_level: str
     user_id: str
     ratings: Optional[dict] = None  # {"academic_performance": 4, "behavior": 3, ...}
+    rubric_id: Optional[str] = None
+    rubric_scores: Optional[dict] = None  # {"criterion_id": 4, ...}
 
 
 class FeedbackResponse(BaseModel):
@@ -38,7 +40,74 @@ class FeedbackResponse(BaseModel):
     grade_level: str
     generated_feedback: str
     ratings: Optional[dict] = None
+    sentiment_label: Optional[str] = None
+    sentiment_score: Optional[float] = None
+    sentiment_breakdown: Optional[dict] = None
+    sentiment_keywords: Optional[list] = None
+    rubric_id: Optional[str] = None
+    rubric_scores: Optional[dict] = None
     created_at: str
+
+
+class RubricCriterionInput(BaseModel):
+    name: str
+    description: Optional[str] = None
+    sort_order: int = 0
+    level_1_label: str = "Beginning"
+    level_1_description: Optional[str] = None
+    level_2_label: str = "Developing"
+    level_2_description: Optional[str] = None
+    level_3_label: str = "Proficient"
+    level_3_description: Optional[str] = None
+    level_4_label: str = "Advanced"
+    level_4_description: Optional[str] = None
+    level_5_label: str = "Exemplary"
+    level_5_description: Optional[str] = None
+
+
+class CreateRubricRequest(BaseModel):
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    subject: Optional[str] = None
+    grade_level: Optional[str] = None
+    criteria: list
+
+
+class UpdateRubricRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    subject: Optional[str] = None
+    grade_level: Optional[str] = None
+    criteria: Optional[list] = None
+
+
+class RubricCriterionResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    sort_order: int = 0
+    level_1_label: str = "Beginning"
+    level_1_description: Optional[str] = None
+    level_2_label: str = "Developing"
+    level_2_description: Optional[str] = None
+    level_3_label: str = "Proficient"
+    level_3_description: Optional[str] = None
+    level_4_label: str = "Advanced"
+    level_4_description: Optional[str] = None
+    level_5_label: str = "Exemplary"
+    level_5_description: Optional[str] = None
+
+
+class RubricResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    subject: Optional[str] = None
+    grade_level: Optional[str] = None
+    criteria: list = []
+    created_at: str
+    updated_at: str
 
 
 class SummarizeRequest(BaseModel):
@@ -55,6 +124,7 @@ class SummaryResponse(BaseModel):
     document_type: str
     summary: str
     summary_length: str
+    mindmap_markdown: Optional[str] = None
     created_at: str
 
 
