@@ -110,6 +110,29 @@ class RubricResponse(BaseModel):
     updated_at: str
 
 
+class BatchStudentEntry(BaseModel):
+    student_name: str
+    context: Optional[str] = None
+    ratings: Optional[dict] = None
+    rubric_scores: Optional[dict] = None
+
+
+class BatchFeedbackRequest(BaseModel):
+    user_id: str
+    feedback_type: str
+    tone: str
+    grade_level: str
+    rubric_id: Optional[str] = None
+    students: list  # list of BatchStudentEntry
+
+
+class BatchFeedbackResponse(BaseModel):
+    total: int
+    completed: int
+    failed: int
+    results: list  # list of FeedbackResponse or error dicts
+
+
 class SummarizeRequest(BaseModel):
     document_name: str
     document_type: str

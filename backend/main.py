@@ -12,6 +12,7 @@ from database import init_db, get_db
 from models import (
     SignupRequest, LoginRequest, UserResponse,
     FeedbackRequest, FeedbackResponse,
+    BatchFeedbackRequest, BatchFeedbackResponse,
     SummarizeRequest, SummaryResponse,
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
 )
@@ -189,6 +190,107 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
             created_at=r[13],
         ))
     return results
+
+
+@app.post("/feedback/batch", response_model=BatchFeedbackResponse)
+async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
+    if not req.students or len(req.students) > 30:
+        raise HTTPException(status_code=400, detail="Provide 1-30 students per batch")
+
+    rubric_data_template = None
+    rubric_criteria_rows = None
+    if req.rubric_id:
+        cursor = await db.execute(
+            "SELECT id, name, description FROM rubric_templates WHERE id = ?", (req.rubric_id,))
+        rubric_row = await cursor.fetchone()
+        if rubric_row:
+            crit_cursor = await db.execute(
+                "SELECT * FROM rubric_criteria WHERE rubric_id = ? ORDER BY sort_order", (req.rubric_id,))
+            rubric_criteria_rows = await crit_cursor.fetchall()
+            rubric_data_template = {
+                "name": rubric_row[1] if isinstance(rubric_row, tuple) else rubric_row["name"],
+            }
+
+    results = []
+    completed = 0
+    failed = 0
+
+    for student in req.students:
+        s_name = student.get("student_name", "").strip() if isinstance(student, dict) else student.student_name.strip()
+        s_context = (student.get("context") if isinstance(student, dict) else student.context) or ""
+        s_ratings = student.get("ratings") if isinstance(student, dict) else student.ratings
+        s_rubric_scores = student.get("rubric_scores") if isinstance(student, dict) else student.rubric_scores
+
+        rubric_data = None
+        if rubric_data_template and rubric_criteria_rows and s_rubric_scores:
+            criteria_with_scores = []
+            for c in rubric_criteria_rows:
+                cid = c[0] if isinstance(c, tuple) else c["id"]
+                cname = c[2] if isinstance(c, tuple) else c["name"]
+                score = s_rubric_scores.get(cid, 3)
+                if isinstance(c, tuple):
+                    col_map = {
+                        "level_1_label": 5, "level_1_description": 6,
+                        "level_2_label": 7, "level_2_description": 8,
+                        "level_3_label": 9, "level_3_description": 10,
+                        "level_4_label": 11, "level_4_description": 12,
+                        "level_5_label": 13, "level_5_description": 14,
+                    }
+                    level_label = c[col_map.get(f"level_{score}_label", 9)]
+                    level_desc = c[col_map.get(f"level_{score}_description", 10)]
+                else:
+                    level_label = c[f"level_{score}_label"]
+                    level_desc = c[f"level_{score}_description"]
+                criteria_with_scores.append({
+                    "name": cname, "score": score,
+                    "level_label": level_label or f"Level {score}",
+                    "level_description": level_desc,
+                })
+            rubric_data = {**rubric_data_template, "criteria": criteria_with_scores}
+
+        try:
+            feedback_text = await generate_feedback(
+                s_name, req.feedback_type, s_context, req.tone, req.grade_level,
+                s_ratings, rubric_data,
+            )
+            sentiment = await analyze_sentiment(feedback_text)
+
+            feedback_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc).isoformat()
+            ratings_json = json.dumps(s_ratings) if s_ratings else None
+            rubric_scores_json = json.dumps(s_rubric_scores) if s_rubric_scores else None
+
+            await db.execute(
+                """INSERT INTO feedback_history
+                   (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
+                    sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
+                    rubric_id, rubric_scores, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (feedback_id, req.user_id, s_name, req.feedback_type,
+                 s_context, feedback_text, req.tone, req.grade_level, ratings_json,
+                 sentiment.get("label"), sentiment.get("score"),
+                 json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
+                 req.rubric_id, rubric_scores_json, now),
+            )
+            await db.commit()
+
+            results.append(FeedbackResponse(
+                id=feedback_id, student_name=s_name, feedback_type=req.feedback_type,
+                context=s_context or None, tone=req.tone, grade_level=req.grade_level,
+                generated_feedback=feedback_text, ratings=s_ratings,
+                sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
+                sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
+                rubric_id=req.rubric_id, rubric_scores=s_rubric_scores,
+                created_at=now,
+            ))
+            completed += 1
+        except Exception as e:
+            failed += 1
+            results.append({"student_name": s_name, "error": str(e)})
+
+    return BatchFeedbackResponse(
+        total=len(req.students), completed=completed, failed=failed, results=results,
+    )
 
 
 @app.delete("/feedback/history/{feedback_id}")
