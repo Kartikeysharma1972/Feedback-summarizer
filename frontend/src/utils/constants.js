@@ -38,8 +38,12 @@ export const DOCUMENT_TYPES = [
   { value: "newsletter", label: "Newsletter" },
   { value: "policy", label: "Policy Document" },
   { value: "meeting_minutes", label: "Meeting Minutes" },
+  { value: "lecture", label: "Lecture / Class Recording" },
+  { value: "audio_note", label: "Audio Note / Voice Memo" },
   { value: "other", label: "Other" },
 ];
+
+export const AUDIO_EXTENSIONS = ["mp3", "wav", "m4a", "ogg", "webm", "flac", "mp4", "mpeg", "mpga"];
 
 export const SUMMARY_LENGTHS = [
   { value: "brief", label: "Brief (2-3 sentences)" },

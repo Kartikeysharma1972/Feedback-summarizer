@@ -2,11 +2,11 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   FileText, Send, Copy, Check, Upload, X, File,
-  Type, Sparkles
+  Type, Sparkles, Mic
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useApi } from "../hooks/useApi";
-import { DOCUMENT_TYPES, SUMMARY_LENGTHS, API_BASE } from "../utils/constants";
+import { DOCUMENT_TYPES, SUMMARY_LENGTHS, API_BASE, AUDIO_EXTENSIONS } from "../utils/constants";
 
 export default function SummarizerPage({ user }) {
   const [docName, setDocName] = useState("");
@@ -78,12 +78,20 @@ export default function SummarizerPage({ user }) {
 
   const validateAndSetFile = (f) => {
     const ext = f.name.split(".").pop().toLowerCase();
-    if (!["pdf", "docx", "txt"].includes(ext)) {
-      setError("Unsupported file type. Use PDF, DOCX, or TXT.");
+    const supported = ["pdf", "docx", "txt", ...AUDIO_EXTENSIONS];
+    if (!supported.includes(ext)) {
+      setError("Unsupported file type. Use PDF, DOCX, TXT, or audio files (MP3, WAV, M4A, etc.).");
+      return;
+    }
+    if (AUDIO_EXTENSIONS.includes(ext) && f.size > 25 * 1024 * 1024) {
+      setError("Audio file must be under 25 MB.");
       return;
     }
     setFile(f);
     if (!docName) setDocName(f.name.replace(/\.[^.]+$/, ""));
+    if (AUDIO_EXTENSIONS.includes(ext) && !["lecture", "audio_note"].includes(docType)) {
+      setDocType("lecture");
+    }
   };
 
   return (
@@ -194,7 +202,11 @@ export default function SummarizerPage({ user }) {
               >
                 {file ? (
                   <div className="flex items-center justify-center gap-3">
-                    <File className="w-8 h-8 text-success" />
+                    {AUDIO_EXTENSIONS.includes(file.name.split(".").pop().toLowerCase()) ? (
+                      <Mic className="w-8 h-8 text-accent" />
+                    ) : (
+                      <File className="w-8 h-8 text-success" />
+                    )}
                     <div className="text-left">
                       <p className="text-sm font-medium text-text-primary">{file.name}</p>
                       <p className="text-xs text-muted">{(file.size / 1024).toFixed(1)} KB</p>
@@ -220,11 +232,11 @@ export default function SummarizerPage({ user }) {
                         browse
                       </button>
                     </p>
-                    <p className="text-xs text-muted">Supports PDF, DOCX, TXT</p>
+                    <p className="text-xs text-muted">Supports PDF, DOCX, TXT, and audio files (MP3, WAV, M4A, OGG, WebM, FLAC)</p>
                     <input
                       ref={fileRef}
                       type="file"
-                      accept=".pdf,.docx,.txt"
+                      accept=".pdf,.docx,.txt,.mp3,.wav,.m4a,.ogg,.webm,.flac,.mp4,.mpeg,.mpga"
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files[0]) validateAndSetFile(e.target.files[0]);
@@ -268,7 +280,11 @@ export default function SummarizerPage({ user }) {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-4">
               <div className="w-12 h-12 rounded-full border-4 border-border border-t-accent animate-spin" />
-              <p className="text-text-secondary text-sm">Summarizing your document...</p>
+              <p className="text-text-secondary text-sm">
+                {file && AUDIO_EXTENSIONS.includes(file.name.split(".").pop().toLowerCase())
+                  ? "Transcribing audio & generating summary..."
+                  : "Summarizing your document..."}
+              </p>
             </div>
           ) : result ? (
             <div>

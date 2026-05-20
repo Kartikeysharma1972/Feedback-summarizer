@@ -12,6 +12,22 @@ def _get_client():
     return _client
 
 
+AUDIO_EXTENSIONS = {"mp3", "wav", "m4a", "ogg", "webm", "flac", "mp4", "mpeg", "mpga"}
+
+
+async def transcribe_audio(file_bytes: bytes, filename: str) -> str:
+    client = _get_client()
+    try:
+        transcription = await client.audio.transcriptions.create(
+            file=(filename, file_bytes),
+            model="whisper-large-v3-turbo",
+            response_format="text",
+        )
+        return transcription.strip() if isinstance(transcription, str) else transcription.text.strip()
+    except Exception as e:
+        raise Exception(f"Failed to transcribe audio: {str(e)}")
+
+
 async def analyze_sentiment(text: str) -> dict:
     client = _get_client()
 
@@ -275,6 +291,8 @@ async def summarize_document(text: str, document_type: str, summary_length: str)
         "newsletter": "Newsletter",
         "policy": "Policy Document",
         "meeting_minutes": "Meeting Minutes",
+        "lecture": "Lecture / Class Recording Transcript",
+        "audio_note": "Audio Note / Voice Memo Transcript",
         "other": "Document",
     }
 

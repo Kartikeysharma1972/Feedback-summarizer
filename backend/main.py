@@ -18,7 +18,7 @@ from models import (
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
 )
 from auth import get_user_by_email, create_user, verify_password
-from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow
+from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow, transcribe_audio, AUDIO_EXTENSIONS
 from file_parser import extract_text
 
 load_dotenv()
@@ -367,10 +367,21 @@ async def upload_and_summarize(
     if len(file_bytes) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    try:
-        text = extract_text(file_bytes, file.filename or "unknown.txt")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    filename = file.filename or "unknown.txt"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if ext in AUDIO_EXTENSIONS:
+        try:
+            text = await transcribe_audio(file_bytes, filename)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="Could not transcribe any speech from the audio file")
+    else:
+        try:
+            text = extract_text(file_bytes, filename)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     try:
         summary_text = await summarize_document(text, document_type, summary_length)
