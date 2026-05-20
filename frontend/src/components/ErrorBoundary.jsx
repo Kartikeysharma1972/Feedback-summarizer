@@ -20,8 +20,11 @@ class ErrorBoundary extends React.Component {
             <h2 className="text-xl font-semibold text-text-primary mb-2">
               Something went wrong
             </h2>
-            <p className="text-text-secondary mb-6">
+            <p className="text-text-secondary mb-2">
               An unexpected error occurred. Please refresh the page.
+            </p>
+            <p className="text-xs text-muted mb-6">
+              If this keeps happening, try clearing your browser cache.
             </p>
             <button
               onClick={() => window.location.reload()}
