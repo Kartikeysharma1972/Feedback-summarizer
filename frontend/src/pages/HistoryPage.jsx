@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, Search, PenTool, FileText, Trash2, Copy, Check,
-  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2, Target
+  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2, Target, Sun, Sprout
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
 import { FEEDBACK_TYPES, TONES, DOCUMENT_TYPES, SUMMARY_LENGTHS } from "../utils/constants";
@@ -268,6 +268,40 @@ export default function HistoryPage({ user }) {
                         <div className="bg-panel p-4 rounded-xl text-sm text-text-primary whitespace-pre-wrap leading-relaxed mb-3">
                           {tab === "feedback" ? item.generated_feedback : item.summary}
                         </div>
+                        {tab === "feedback" && item.glow_grow && (item.glow_grow.glows?.length > 0 || item.glow_grow.grows?.length > 0) && (
+                          <div className="grid sm:grid-cols-2 gap-2 mb-3">
+                            {item.glow_grow.glows?.length > 0 && (
+                              <div className="bg-emerald-50/50 rounded-lg p-3 border border-emerald-100">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                                  <span className="text-xs font-semibold text-emerald-800">Glows</span>
+                                </div>
+                                <ul className="space-y-1">
+                                  {item.glow_grow.glows.map((g, i) => (
+                                    <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
+                                      <span className="text-emerald-400 mt-0.5">•</span>{g}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {item.glow_grow.grows?.length > 0 && (
+                              <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100">
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <Sprout className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="text-xs font-semibold text-blue-800">Grows</span>
+                                </div>
+                                <ul className="space-y-1">
+                                  {item.glow_grow.grows.map((g, i) => (
+                                    <li key={i} className="text-xs text-blue-700 flex items-start gap-1.5">
+                                      <span className="text-blue-400 mt-0.5">•</span>{g}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() =>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap, Star, TrendingUp, Calendar, MessageSquare,
   ChevronDown, ChevronUp, Smile, Frown, Meh, AlertCircle,
-  BookOpen, Clock, Award,
+  BookOpen, Clock, Award, Sun, Sprout,
 } from "lucide-react";
 import { API_BASE, FEEDBACK_TYPES, TONES } from "../utils/constants";
 
@@ -144,6 +144,44 @@ function FeedbackCard({ item, isFirst }) {
                         <div className="text-[10px] text-slate-400 capitalize">{key}</div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {item.glow_grow && (item.glow_grow.glows?.length > 0 || item.glow_grow.grows?.length > 0) && (
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Glow & Grow</h4>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {item.glow_grow.glows?.length > 0 && (
+                      <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Sun className="w-3.5 h-3.5 text-amber-500" />
+                          <span className="text-xs font-semibold text-emerald-700">Glows</span>
+                        </div>
+                        <ul className="space-y-1">
+                          {item.glow_grow.glows.map((g, i) => (
+                            <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
+                              <span className="text-emerald-400 mt-0.5">•</span>{g}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {item.glow_grow.grows?.length > 0 && (
+                      <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Sprout className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-xs font-semibold text-blue-700">Grows</span>
+                        </div>
+                        <ul className="space-y-1">
+                          {item.glow_grow.grows.map((g, i) => (
+                            <li key={i} className="text-xs text-blue-700 flex items-start gap-1.5">
+                              <span className="text-blue-400 mt-0.5">•</span>{g}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -194,6 +194,35 @@ INSTRUCTIONS:
         raise Exception(f"Failed to generate feedback: {str(e)}")
 
 
+async def generate_glow_grow(feedback_text: str) -> dict:
+    client = _get_client()
+
+    system_prompt = """You are an expert teacher who extracts structured "Glow & Grow" summaries from student feedback. Analyze the feedback and return a JSON object with:
+- "glows": array of 2-4 specific strengths (things the student is doing well)
+- "grows": array of 2-4 specific growth areas (things the student needs to improve)
+
+Each item should be a concise, actionable sentence (10-20 words). Be specific — reference actual skills, behaviors, or subjects mentioned in the feedback.
+
+Return ONLY valid JSON, no other text."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Extract Glow & Grow from this feedback:\n\n{feedback_text[:3000]}"},
+            ],
+            temperature=0.2,
+            max_tokens=500,
+        )
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except Exception:
+        return {"glows": [], "grows": []}
+
+
 async def generate_mindmap_markdown(text: str, document_type: str) -> str:
     client = _get_client()
 

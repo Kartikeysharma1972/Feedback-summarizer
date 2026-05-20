@@ -18,7 +18,7 @@ from models import (
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
 )
 from auth import get_user_by_email, create_user, verify_password
-from groq_client import generate_feedback, summarize_document, analyze_sentiment
+from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow
 from file_parser import extract_text
 
 load_dotenv()
@@ -122,24 +122,26 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
     sentiment = await analyze_sentiment(feedback_text)
+    glow_grow = await generate_glow_grow(feedback_text)
 
     feedback_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     ratings_json = json.dumps(req.ratings) if req.ratings else None
     rubric_scores_json = json.dumps(req.rubric_scores) if req.rubric_scores else None
     standards_json = json.dumps(req.standards) if req.standards else None
+    glow_grow_json = json.dumps(glow_grow) if glow_grow else None
 
     await db.execute(
         """INSERT INTO feedback_history
            (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
             sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-            rubric_id, rubric_scores, standards_tags, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rubric_id, rubric_scores, standards_tags, glow_grow, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (feedback_id, req.user_id, req.student_name, req.feedback_type,
          req.context or "", feedback_text, req.tone, req.grade_level, ratings_json,
          sentiment.get("label"), sentiment.get("score"),
          json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-         req.rubric_id, rubric_scores_json, standards_json, now),
+         req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, now),
     )
     await db.commit()
 
@@ -150,7 +152,7 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
         sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
         sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
         rubric_id=req.rubric_id, rubric_scores=req.rubric_scores,
-        standards=req.standards,
+        standards=req.standards, glow_grow=glow_grow,
         created_at=now,
     )
 
@@ -160,7 +162,7 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
     cursor = await db.execute(
         """SELECT id, user_id, student_name, feedback_type, context, generated_feedback,
                   tone, grade_level, ratings, sentiment_label, sentiment_score,
-                  sentiment_breakdown, sentiment_keywords, standards_tags, created_at
+                  sentiment_breakdown, sentiment_keywords, standards_tags, glow_grow, created_at
            FROM feedback_history WHERE user_id = ? ORDER BY created_at DESC""",
         (user_id,),
     )
@@ -171,6 +173,7 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
         sentiment_bd = None
         sentiment_kw = None
         standards_data = None
+        glow_grow_data = None
         try:
             if r[8]:
                 ratings_data = json.loads(r[8])
@@ -191,13 +194,18 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
                 standards_data = json.loads(r[13])
         except Exception:
             pass
+        try:
+            if r[14]:
+                glow_grow_data = json.loads(r[14])
+        except Exception:
+            pass
         results.append(FeedbackResponse(
             id=r[0], student_name=r[2], feedback_type=r[3], context=r[4],
             generated_feedback=r[5], tone=r[6], grade_level=r[7],
             ratings=ratings_data, sentiment_label=r[9], sentiment_score=r[10],
             sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
-            standards=standards_data,
-            created_at=r[14],
+            standards=standards_data, glow_grow=glow_grow_data,
+            created_at=r[15],
         ))
     return results
 
@@ -265,24 +273,26 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
                 s_ratings, rubric_data, s_standards,
             )
             sentiment = await analyze_sentiment(feedback_text)
+            glow_grow = await generate_glow_grow(feedback_text)
 
             feedback_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
             ratings_json = json.dumps(s_ratings) if s_ratings else None
             rubric_scores_json = json.dumps(s_rubric_scores) if s_rubric_scores else None
             standards_json = json.dumps(s_standards) if s_standards else None
+            glow_grow_json = json.dumps(glow_grow) if glow_grow else None
 
             await db.execute(
                 """INSERT INTO feedback_history
                    (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
                     sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-                    rubric_id, rubric_scores, standards_tags, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    rubric_id, rubric_scores, standards_tags, glow_grow, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (feedback_id, req.user_id, s_name, req.feedback_type,
                  s_context, feedback_text, req.tone, req.grade_level, ratings_json,
                  sentiment.get("label"), sentiment.get("score"),
                  json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-                 req.rubric_id, rubric_scores_json, standards_json, now),
+                 req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, now),
             )
             await db.commit()
 
@@ -293,7 +303,7 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
                 sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
                 sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
                 rubric_id=req.rubric_id, rubric_scores=s_rubric_scores,
-                standards=s_standards,
+                standards=s_standards, glow_grow=glow_grow,
                 created_at=now,
             ))
             completed += 1
@@ -633,7 +643,7 @@ async def student_portal(token: str, db=Depends(get_db)):
     fb_cursor = await db.execute(
         """SELECT id, student_name, feedback_type, context, generated_feedback,
                   tone, grade_level, ratings, sentiment_label, sentiment_score,
-                  sentiment_breakdown, sentiment_keywords, standards_tags, created_at
+                  sentiment_breakdown, sentiment_keywords, standards_tags, glow_grow, created_at
            FROM feedback_history WHERE user_id = ? AND student_name = ? ORDER BY created_at DESC""",
         (user_id, student_name),
     )
@@ -647,6 +657,7 @@ async def student_portal(token: str, db=Depends(get_db)):
         sentiment_bd = None
         sentiment_kw = None
         standards_data = None
+        glow_grow_data = None
         try:
             if r[7]:
                 ratings_data = json.loads(r[7])
@@ -667,6 +678,11 @@ async def student_portal(token: str, db=Depends(get_db)):
                 standards_data = json.loads(r[12])
         except Exception:
             pass
+        try:
+            if r[13]:
+                glow_grow_data = json.loads(r[13])
+        except Exception:
+            pass
 
         if r[9] is not None:
             total_sentiment += r[9]
@@ -677,8 +693,8 @@ async def student_portal(token: str, db=Depends(get_db)):
             generated_feedback=r[4], tone=r[5], grade_level=r[6],
             ratings=ratings_data, sentiment_label=r[8], sentiment_score=r[9],
             sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
-            standards=standards_data,
-            created_at=r[13],
+            standards=standards_data, glow_grow=glow_grow_data,
+            created_at=r[14],
         ))
 
     stats = {

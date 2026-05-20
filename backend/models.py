@@ -48,6 +48,7 @@ class FeedbackResponse(BaseModel):
     rubric_id: Optional[str] = None
     rubric_scores: Optional[dict] = None
     standards: Optional[list] = None
+    glow_grow: Optional[dict] = None
     created_at: str
 
 

@@ -64,6 +64,7 @@ async def init_db():
             ("rubric_id", "TEXT"),
             ("rubric_scores", "TEXT"),
             ("standards_tags", "TEXT"),
+            ("glow_grow", "TEXT"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE feedback_history ADD COLUMN {col} {col_type}")

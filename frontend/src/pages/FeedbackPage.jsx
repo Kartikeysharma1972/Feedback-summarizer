@@ -4,7 +4,7 @@ import {
   PenTool, Send, Copy, Check, RefreshCw, Sparkles,
   User, BookOpen, MessageSquare, Heart, Star, Download,
   Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus,
-  ClipboardList, ChevronDown, ChevronUp, Target,
+  ClipboardList, ChevronDown, ChevronUp, Target, Sun, Sprout,
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
 import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE, STANDARD_FRAMEWORKS } from "../utils/constants";
@@ -828,6 +828,54 @@ export default function FeedbackPage({ user }) {
               </div>
             )}
           </motion.div>
+
+          {/* Glow & Grow */}
+          {result?.glow_grow && (result.glow_grow.glows?.length > 0 || result.glow_grow.grows?.length > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-panel p-5 mt-4"
+            >
+              <h4 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Glow & Grow
+              </h4>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {result.glow_grow.glows?.length > 0 && (
+                  <div className="bg-emerald-50/50 rounded-xl p-3.5 border border-emerald-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Sun className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-semibold text-emerald-800">Glows</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {result.glow_grow.glows.map((g, i) => (
+                        <li key={i} className="text-sm text-emerald-700 flex items-start gap-2">
+                          <span className="text-emerald-400 mt-1 flex-shrink-0">•</span>
+                          {g}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {result.glow_grow.grows?.length > 0 && (
+                  <div className="bg-blue-50/50 rounded-xl p-3.5 border border-blue-100">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Sprout className="w-4 h-4 text-emerald-500" />
+                      <span className="text-sm font-semibold text-blue-800">Grows</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {result.glow_grow.grows.map((g, i) => (
+                        <li key={i} className="text-sm text-blue-700 flex items-start gap-2">
+                          <span className="text-blue-400 mt-1 flex-shrink-0">•</span>
+                          {g}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Report Card - shows after feedback is generated */}
           {result && (
