@@ -102,6 +102,16 @@ async def init_db():
                 FOREIGN KEY (rubric_id) REFERENCES rubric_templates(id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS student_share_tokens (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                student_name TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
         await db.commit()
 
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, Search, PenTool, FileText, Trash2, Copy, Check,
-  ChevronDown, ChevronUp, X, Calendar, Filter
+  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
 import { FEEDBACK_TYPES, TONES, DOCUMENT_TYPES, SUMMARY_LENGTHS } from "../utils/constants";
@@ -31,6 +31,7 @@ export default function HistoryPage({ user }) {
   const [timeRange, setTimeRange] = useState("all");
   const [expanded, setExpanded] = useState(null);
   const [copied, setCopied] = useState(null);
+  const [sharing, setSharing] = useState(null);
   const { loading, execute } = useApi();
 
   const fetchData = async () => {
@@ -62,6 +63,22 @@ export default function HistoryPage({ user }) {
     navigator.clipboard.writeText(text);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleShare = async (studentName) => {
+    try {
+      setSharing(studentName);
+      const res = await execute("/students/share", {
+        method: "POST",
+        body: JSON.stringify({ user_id: user.id, student_name: studentName }),
+      });
+      const shareUrl = `${window.location.origin}/student/${res.token}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(`share-${studentName}`);
+      setTimeout(() => setCopied(null), 3000);
+    } catch {} finally {
+      setSharing(null);
+    }
   };
 
   const currentList = tab === "feedback" ? feedbackList : summaryList;
@@ -252,6 +269,30 @@ export default function HistoryPage({ user }) {
                             )}
                             {copied === item.id ? "Copied!" : "Copy"}
                           </button>
+                          {tab === "feedback" && (
+                            <button
+                              onClick={() => handleShare(item.student_name)}
+                              disabled={sharing === item.student_name}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            >
+                              {copied === `share-${item.student_name}` ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-success" />
+                                  Link Copied!
+                                </>
+                              ) : sharing === item.student_name ? (
+                                <>
+                                  <Link2 className="w-3.5 h-3.5 animate-pulse" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Share2 className="w-3.5 h-3.5" />
+                                  Share with Student
+                                </>
+                              )}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDelete(tab === "feedback" ? "feedback" : "summarizer", item.id)}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-danger hover:bg-red-50 rounded-lg transition-colors"

@@ -133,6 +133,24 @@ class BatchFeedbackResponse(BaseModel):
     results: list  # list of FeedbackResponse or error dicts
 
 
+class ShareTokenRequest(BaseModel):
+    user_id: str
+    student_name: str
+
+
+class ShareTokenResponse(BaseModel):
+    token: str
+    student_name: str
+    share_url: str
+
+
+class StudentPortalData(BaseModel):
+    student_name: str
+    teacher_name: str
+    feedback: list
+    stats: dict
+
+
 class SummarizeRequest(BaseModel):
     document_name: str
     document_type: str

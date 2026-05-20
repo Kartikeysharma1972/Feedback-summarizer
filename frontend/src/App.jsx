@@ -10,6 +10,8 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import HistoryPage from "./pages/HistoryPage";
 import RubricPage from "./pages/RubricPage";
 import BatchFeedbackPage from "./pages/BatchFeedbackPage";
+import StudentPortalPage from "./pages/StudentPortalPage";
+import SharedStudentsPage from "./pages/SharedStudentsPage";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -49,9 +51,11 @@ function App() {
           <Route path="batch" element={<BatchFeedbackPage user={user} />} />
           <Route path="summarizer" element={<SummarizerPage user={user} />} />
           <Route path="rubrics" element={<RubricPage user={user} />} />
+          <Route path="shared" element={<SharedStudentsPage user={user} />} />
           <Route path="analytics" element={<AnalyticsPage user={user} />} />
           <Route path="history" element={<HistoryPage user={user} />} />
         </Route>
+        <Route path="/student/:token" element={<StudentPortalPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </ErrorBoundary>

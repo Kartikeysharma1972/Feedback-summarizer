@@ -13,6 +13,7 @@ from models import (
     SignupRequest, LoginRequest, UserResponse,
     FeedbackRequest, FeedbackResponse,
     BatchFeedbackRequest, BatchFeedbackResponse,
+    ShareTokenRequest, ShareTokenResponse, StudentPortalData,
     SummarizeRequest, SummaryResponse,
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
 )
@@ -540,6 +541,137 @@ async def delete_rubric(rubric_id: str, db=Depends(get_db)):
     await db.execute("DELETE FROM rubric_templates WHERE id = ?", (rubric_id,))
     await db.commit()
     return {"status": "deleted"}
+
+
+# ── Student Portal ───────────────────────────────────────────────
+
+import secrets
+import string
+
+
+def _generate_token(length=8):
+    alphabet = string.ascii_lowercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+@app.post("/students/share", response_model=ShareTokenResponse)
+async def create_share_token(req: ShareTokenRequest, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT id FROM student_share_tokens WHERE user_id = ? AND student_name = ? AND is_active = 1",
+        (req.user_id, req.student_name),
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        token = existing[0] if isinstance(existing, tuple) else existing["id"]
+        return ShareTokenResponse(
+            token=token, student_name=req.student_name,
+            share_url=f"/student/{token}",
+        )
+
+    token = _generate_token()
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        "INSERT INTO student_share_tokens (id, user_id, student_name, created_at, is_active) VALUES (?, ?, ?, ?, 1)",
+        (token, req.user_id, req.student_name, now),
+    )
+    await db.commit()
+    return ShareTokenResponse(
+        token=token, student_name=req.student_name,
+        share_url=f"/student/{token}",
+    )
+
+
+@app.get("/students/shared")
+async def list_shared_students(user_id: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT id, student_name, created_at FROM student_share_tokens WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC",
+        (user_id,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        {"token": r[0], "student_name": r[1], "created_at": r[2]}
+        for r in rows
+    ]
+
+
+@app.delete("/students/share/{token}")
+async def revoke_share_token(token: str, db=Depends(get_db)):
+    await db.execute("UPDATE student_share_tokens SET is_active = 0 WHERE id = ?", (token,))
+    await db.commit()
+    return {"status": "revoked"}
+
+
+@app.get("/students/portal/{token}", response_model=StudentPortalData)
+async def student_portal(token: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT user_id, student_name FROM student_share_tokens WHERE id = ? AND is_active = 1",
+        (token,),
+    )
+    share = await cursor.fetchone()
+    if not share:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    user_id = share[0] if isinstance(share, tuple) else share["user_id"]
+    student_name = share[1] if isinstance(share, tuple) else share["student_name"]
+
+    user_cursor = await db.execute("SELECT name FROM users WHERE id = ?", (user_id,))
+    user_row = await user_cursor.fetchone()
+    teacher_name = (user_row[0] if isinstance(user_row, tuple) else user_row["name"]) if user_row else "Teacher"
+
+    fb_cursor = await db.execute(
+        """SELECT id, student_name, feedback_type, context, generated_feedback,
+                  tone, grade_level, ratings, sentiment_label, sentiment_score,
+                  sentiment_breakdown, sentiment_keywords, created_at
+           FROM feedback_history WHERE user_id = ? AND student_name = ? ORDER BY created_at DESC""",
+        (user_id, student_name),
+    )
+    rows = await fb_cursor.fetchall()
+
+    feedback = []
+    total_sentiment = 0
+    sentiment_count = 0
+    for r in rows:
+        ratings_data = None
+        sentiment_bd = None
+        sentiment_kw = None
+        try:
+            if r[7]:
+                ratings_data = json.loads(r[7])
+        except Exception:
+            pass
+        try:
+            if r[10]:
+                sentiment_bd = json.loads(r[10])
+        except Exception:
+            pass
+        try:
+            if r[11]:
+                sentiment_kw = json.loads(r[11])
+        except Exception:
+            pass
+
+        if r[9] is not None:
+            total_sentiment += r[9]
+            sentiment_count += 1
+
+        feedback.append(FeedbackResponse(
+            id=r[0], student_name=r[1], feedback_type=r[2], context=r[3],
+            generated_feedback=r[4], tone=r[5], grade_level=r[6],
+            ratings=ratings_data, sentiment_label=r[8], sentiment_score=r[9],
+            sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
+            created_at=r[12],
+        ))
+
+    stats = {
+        "total_feedback": len(feedback),
+        "avg_sentiment": round(total_sentiment / sentiment_count, 2) if sentiment_count else 0,
+        "latest_date": feedback[0].created_at if feedback else None,
+    }
+
+    return StudentPortalData(
+        student_name=student_name, teacher_name=teacher_name,
+        feedback=feedback, stats=stats,
+    )
 
 
 # ── Analytics ────────────────────────────────────────────────────

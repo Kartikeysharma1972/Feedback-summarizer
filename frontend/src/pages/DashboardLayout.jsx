@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   GraduationCap, PenTool, FileText, Clock, LogOut,
-  Menu, X, ChevronRight, BarChart3, ClipboardList, Users
+  Menu, X, ChevronRight, BarChart3, ClipboardList, Users, Share2
 } from "lucide-react";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/dashboard/batch", label: "Batch Feedback", icon: Users },
   { to: "/dashboard/rubrics", label: "Rubric Templates", icon: ClipboardList },
   { to: "/dashboard/summarizer", label: "Document Summarizer", icon: FileText },
+  { to: "/dashboard/shared", label: "Student Portal", icon: Share2 },
   { to: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/dashboard/history", label: "History", icon: Clock },
 ];
