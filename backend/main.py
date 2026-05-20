@@ -16,9 +16,10 @@ from models import (
     ShareTokenRequest, ShareTokenResponse, StudentPortalData,
     SummarizeRequest, SummaryResponse,
     CreateRubricRequest, UpdateRubricRequest, RubricResponse, RubricCriterionResponse,
+    ParentReportRequest, ParentReportResponse,
 )
 from auth import get_user_by_email, create_user, verify_password
-from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow, transcribe_audio, AUDIO_EXTENSIONS
+from groq_client import generate_feedback, summarize_document, analyze_sentiment, generate_glow_grow, transcribe_audio, generate_parent_report, AUDIO_EXTENSIONS
 from file_parser import extract_text
 
 load_dotenv()
@@ -719,6 +720,118 @@ async def student_portal(token: str, db=Depends(get_db)):
         student_name=student_name, teacher_name=teacher_name,
         feedback=feedback, stats=stats,
     )
+
+
+# ── Parent Reports ──────────────────────────────────────────────
+
+@app.post("/reports/generate", response_model=ParentReportResponse)
+async def create_parent_report(req: ParentReportRequest, db=Depends(get_db)):
+    user_cursor = await db.execute("SELECT name FROM users WHERE id = ?", (req.user_id,))
+    user_row = await user_cursor.fetchone()
+    if not user_row:
+        raise HTTPException(status_code=404, detail="User not found")
+    teacher_name = user_row[0] if isinstance(user_row, tuple) else user_row["name"]
+
+    fb_cursor = await db.execute(
+        """SELECT id, feedback_type, context, generated_feedback, tone, grade_level,
+                  ratings, sentiment_label, sentiment_score, glow_grow, language, created_at
+           FROM feedback_history WHERE user_id = ? AND student_name = ? ORDER BY created_at DESC""",
+        (req.user_id, req.student_name),
+    )
+    rows = await fb_cursor.fetchall()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No feedback found for this student")
+
+    grade_level = rows[0][5] if isinstance(rows[0], tuple) else rows[0]["grade_level"]
+
+    feedback_entries = []
+    for r in rows:
+        entry = {
+            "feedback_type": r[1],
+            "context": r[2],
+            "generated_feedback": r[3],
+            "tone": r[4],
+            "grade_level": r[5],
+            "sentiment_label": r[7],
+            "sentiment_score": r[8],
+            "created_at": r[11],
+        }
+        try:
+            if r[6]:
+                entry["ratings"] = json.loads(r[6])
+        except Exception:
+            pass
+        try:
+            if r[9]:
+                entry["glow_grow"] = json.loads(r[9])
+        except Exception:
+            pass
+        feedback_entries.append(entry)
+
+    try:
+        report_text = await generate_parent_report(
+            req.student_name, grade_level, teacher_name, req.report_type,
+            feedback_entries, req.language,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    report_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    await db.execute(
+        """INSERT INTO parent_reports
+           (id, user_id, student_name, grade_level, report_type, report_text, feedback_count, language, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (report_id, req.user_id, req.student_name, grade_level, req.report_type,
+         report_text, len(feedback_entries), req.language, now),
+    )
+    await db.commit()
+
+    return ParentReportResponse(
+        id=report_id, student_name=req.student_name, grade_level=grade_level,
+        report_type=req.report_type, report_text=report_text,
+        feedback_count=len(feedback_entries), language=req.language, created_at=now,
+    )
+
+
+@app.get("/reports/history")
+async def get_report_history(user_id: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        "SELECT * FROM parent_reports WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        ParentReportResponse(
+            id=r[0], student_name=r[2], grade_level=r[3],
+            report_type=r[4], report_text=r[5],
+            feedback_count=r[6], language=r[7] or "english", created_at=r[8],
+        )
+        for r in rows
+    ]
+
+
+@app.delete("/reports/history/{report_id}")
+async def delete_report(report_id: str, db=Depends(get_db)):
+    await db.execute("DELETE FROM parent_reports WHERE id = ?", (report_id,))
+    await db.commit()
+    return {"status": "deleted"}
+
+
+@app.get("/reports/students")
+async def get_report_students(user_id: str, db=Depends(get_db)):
+    cursor = await db.execute(
+        """SELECT student_name, grade_level, COUNT(*) as count, MAX(created_at) as latest
+           FROM feedback_history WHERE user_id = ?
+           GROUP BY student_name ORDER BY latest DESC""",
+        (user_id,),
+    )
+    rows = await cursor.fetchall()
+    return [
+        {"student_name": r[0], "grade_level": r[1], "feedback_count": r[2], "latest_feedback": r[3]}
+        for r in rows
+    ]
 
 
 # ── Analytics ────────────────────────────────────────────────────

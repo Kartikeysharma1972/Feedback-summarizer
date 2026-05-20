@@ -245,6 +245,82 @@ Return ONLY valid JSON, no other text."""
         return {"glows": [], "grows": []}
 
 
+async def generate_parent_report(student_name: str, grade_level: str, teacher_name: str, report_type: str, feedback_entries: list, language: str = "english") -> str:
+    client = _get_client()
+
+    report_type_labels = {
+        "ptm": "Parent-Teacher Meeting (PTM) Report — comprehensive, covering all aspects of the student's performance",
+        "progress": "Progress Update — focused on recent improvements and current standing",
+        "concern": "Concern Report — highlighting areas that need parental attention and intervention",
+        "appreciation": "Appreciation Report — celebrating the student's achievements and positive qualities",
+    }
+
+    feedback_summary = ""
+    for i, entry in enumerate(feedback_entries[:15], 1):
+        feedback_summary += f"\n--- Feedback #{i} ({entry.get('feedback_type', 'general')}, {entry.get('created_at', '')[:10]}) ---\n"
+        feedback_summary += f"Tone: {entry.get('tone', 'N/A')} | Sentiment: {entry.get('sentiment_label', 'N/A')}\n"
+        if entry.get('ratings'):
+            ratings_str = ", ".join(f"{k}: {v}/5" for k, v in entry['ratings'].items())
+            feedback_summary += f"Ratings: {ratings_str}\n"
+        if entry.get('glow_grow'):
+            gg = entry['glow_grow']
+            if gg.get('glows'):
+                feedback_summary += f"Glows: {'; '.join(gg['glows'][:3])}\n"
+            if gg.get('grows'):
+                feedback_summary += f"Grows: {'; '.join(gg['grows'][:3])}\n"
+        feedback_summary += f"Feedback: {entry.get('generated_feedback', '')[:500]}\n"
+
+    lang_instruction = f"\n\nIMPORTANT: Write the ENTIRE report in {language.capitalize()}. Use natural, fluent phrasing. Keep the student's name as-is." if language != "english" else ""
+
+    system_prompt = f"""You are an experienced Indian school teacher writing a professional parent report. You compile multiple feedback entries into ONE cohesive, comprehensive report.
+
+REPORT TYPE: {report_type_labels.get(report_type, report_type_labels['ptm'])}
+
+STRUCTURE:
+1. Opening: Address "Dear Parent/Guardian of [Student Name]" — warm, professional greeting from {teacher_name}.
+2. Overview: Brief summary of the student's overall standing in {grade_level}, number of assessments covered.
+3. Academic Strengths: Specific areas where the student excels, with evidence from feedback history.
+4. Areas for Growth: Honest but constructive areas needing improvement, with specific suggestions for parents.
+5. Behavioral & Social Observations: Communication, discipline, participation patterns across feedback.
+6. Progress Trends: If multiple feedback entries show improvement or decline, highlight the trajectory.
+7. Recommendations for Home: 3-5 specific, actionable things parents can do to support the student.
+8. Closing: Positive, forward-looking statement. Invite parents to discuss further.
+
+RULES:
+- Synthesize ALL feedback entries into a unified narrative — do NOT list them separately.
+- Be specific: reference actual ratings, patterns, and observations from the data.
+- Professional but warm tone suitable for Indian school PTM reports.
+- 400-600 words, flowing paragraphs ONLY — no markdown, no bullets in the main body (bullets OK only in recommendations section).
+- Never mention "AI", "generated", or "feedback entries" — write as if you personally observed the student.
+- Sign off as "{teacher_name}".{lang_instruction}"""
+
+    user_prompt = f"""Generate a {report_type_labels.get(report_type, 'PTM')} for:
+
+Student: {student_name}
+Grade: {grade_level}
+Teacher: {teacher_name}
+Total Feedback Entries: {len(feedback_entries)}
+
+FEEDBACK HISTORY:
+{feedback_summary}
+
+Compile all the above into a single cohesive parent report."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.6,
+            max_tokens=1500,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        raise Exception(f"Failed to generate parent report: {str(e)}")
+
+
 async def generate_mindmap_markdown(text: str, document_type: str) -> str:
     client = _get_client()
 

@@ -12,6 +12,7 @@ import RubricPage from "./pages/RubricPage";
 import BatchFeedbackPage from "./pages/BatchFeedbackPage";
 import StudentPortalPage from "./pages/StudentPortalPage";
 import SharedStudentsPage from "./pages/SharedStudentsPage";
+import ParentReportPage from "./pages/ParentReportPage";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -52,6 +53,7 @@ function App() {
           <Route path="summarizer" element={<SummarizerPage user={user} />} />
           <Route path="rubrics" element={<RubricPage user={user} />} />
           <Route path="shared" element={<SharedStudentsPage user={user} />} />
+          <Route path="reports" element={<ParentReportPage user={user} />} />
           <Route path="analytics" element={<AnalyticsPage user={user} />} />
           <Route path="history" element={<HistoryPage user={user} />} />
         </Route>

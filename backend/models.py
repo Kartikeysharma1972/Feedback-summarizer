@@ -182,3 +182,24 @@ class UploadSummarizeRequest(BaseModel):
     document_type: str
     summary_length: str
     user_id: str
+
+
+class ParentReportRequest(BaseModel):
+    user_id: str
+    student_name: str
+    report_type: str = "ptm"
+    include_ratings: bool = True
+    include_sentiment: bool = True
+    include_glow_grow: bool = True
+    language: str = "english"
+
+
+class ParentReportResponse(BaseModel):
+    id: str
+    student_name: str
+    grade_level: str
+    report_type: str
+    report_text: str
+    feedback_count: int
+    language: Optional[str] = "english"
+    created_at: str

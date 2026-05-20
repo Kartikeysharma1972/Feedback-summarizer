@@ -106,6 +106,20 @@ async def init_db():
             )
         """)
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS parent_reports (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                student_name TEXT NOT NULL,
+                grade_level TEXT NOT NULL,
+                report_type TEXT NOT NULL,
+                report_text TEXT NOT NULL,
+                feedback_count INTEGER NOT NULL DEFAULT 0,
+                language TEXT DEFAULT 'english',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS student_share_tokens (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
