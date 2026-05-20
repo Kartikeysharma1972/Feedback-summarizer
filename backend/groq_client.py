@@ -41,7 +41,7 @@ Return ONLY valid JSON, no other text."""
         return {"label": "neutral", "score": 0.5, "breakdown": {"positive": 33, "negative": 33, "neutral": 34}, "keywords": []}
 
 
-async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None, rubric_data: dict = None, standards: list = None) -> str:
+async def generate_feedback(student_name: str, feedback_type: str, context: str, tone: str, grade_level: str, ratings: dict = None, rubric_data: dict = None, standards: list = None, language: str = "english") -> str:
     client = _get_client()
 
     type_labels = {
@@ -102,7 +102,9 @@ RULES:
 
 If a RUBRIC-BASED ASSESSMENT is provided, use the rubric criteria names and level descriptions to generate more specific, criterion-aligned feedback. Reference the rubric criteria by name in your feedback. The rubric assessment takes priority over generic star ratings when both are present.
 
-If EDUCATIONAL STANDARDS are provided, explicitly reference the relevant standards in your feedback. Explain how the student's performance aligns with each selected standard — where they meet or exceed the standard, and where they need growth. Use the standard names naturally in the feedback text (e.g., "In terms of Reading Comprehension, Arjun demonstrates..."). This helps parents and administrators understand how the student is progressing against curriculum benchmarks."""
+If EDUCATIONAL STANDARDS are provided, explicitly reference the relevant standards in your feedback. Explain how the student's performance aligns with each selected standard — where they meet or exceed the standard, and where they need growth. Use the standard names naturally in the feedback text (e.g., "In terms of Reading Comprehension, Arjun demonstrates..."). This helps parents and administrators understand how the student is progressing against curriculum benchmarks.
+
+If a LANGUAGE other than English is specified, write the ENTIRE feedback in that language. Use natural, fluent phrasing — not machine-translated text. Keep the student's name as-is (do not transliterate). The feedback should read as if written by a native speaker of that language."""
 
     ratings_text = ""
     if ratings:
@@ -169,7 +171,8 @@ If EDUCATIONAL STANDARDS are provided, explicitly reference the relevant standar
 Student Name: {student_name}
 Grade Level: {grade_level}
 Feedback Type: {type_labels.get(feedback_type, feedback_type)}
-Tone: {tone_labels.get(tone, tone)}{ratings_text}{rubric_text}{standards_text}{extra_insight_text}
+Tone: {tone_labels.get(tone, tone)}
+Language: {language.capitalize()}{ratings_text}{rubric_text}{standards_text}{extra_insight_text}
 
 INSTRUCTIONS:
 1. The RATINGS above are your COMPLETE intelligence source. Analyze the numbers — identify strengths (4-5), average areas (3), and concerns (1-2).
@@ -177,7 +180,8 @@ INSTRUCTIONS:
 3. Find patterns and contrasts between ratings and address them.
 4. Give concrete, actionable suggestions with specific daily/weekly habits.
 5. Extra Insight is optional bonus — if absent, generate EQUALLY rich feedback from ratings alone.
-6. Start with the student's name. Write flowing paragraphs only."""
+6. Start with the student's name. Write flowing paragraphs only.
+7. Write the ENTIRE feedback in the specified Language. If not English, write fluently in that language."""
 
     try:
         response = await client.chat.completions.create(
@@ -194,14 +198,16 @@ INSTRUCTIONS:
         raise Exception(f"Failed to generate feedback: {str(e)}")
 
 
-async def generate_glow_grow(feedback_text: str) -> dict:
+async def generate_glow_grow(feedback_text: str, language: str = "english") -> dict:
     client = _get_client()
 
-    system_prompt = """You are an expert teacher who extracts structured "Glow & Grow" summaries from student feedback. Analyze the feedback and return a JSON object with:
+    lang_instruction = f' Write the glows and grows in {language.capitalize()}.' if language != "english" else ""
+
+    system_prompt = f"""You are an expert teacher who extracts structured "Glow & Grow" summaries from student feedback. Analyze the feedback and return a JSON object with:
 - "glows": array of 2-4 specific strengths (things the student is doing well)
 - "grows": array of 2-4 specific growth areas (things the student needs to improve)
 
-Each item should be a concise, actionable sentence (10-20 words). Be specific — reference actual skills, behaviors, or subjects mentioned in the feedback.
+Each item should be a concise, actionable sentence (10-20 words). Be specific — reference actual skills, behaviors, or subjects mentioned in the feedback.{lang_instruction}
 
 Return ONLY valid JSON, no other text."""
 

@@ -116,13 +116,13 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
     try:
         feedback_text = await generate_feedback(
             req.student_name, req.feedback_type, req.context or "", req.tone, req.grade_level,
-            req.ratings, rubric_data, req.standards,
+            req.ratings, rubric_data, req.standards, req.language,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     sentiment = await analyze_sentiment(feedback_text)
-    glow_grow = await generate_glow_grow(feedback_text)
+    glow_grow = await generate_glow_grow(feedback_text, req.language)
 
     feedback_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
@@ -135,13 +135,13 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
         """INSERT INTO feedback_history
            (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
             sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-            rubric_id, rubric_scores, standards_tags, glow_grow, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rubric_id, rubric_scores, standards_tags, glow_grow, language, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (feedback_id, req.user_id, req.student_name, req.feedback_type,
          req.context or "", feedback_text, req.tone, req.grade_level, ratings_json,
          sentiment.get("label"), sentiment.get("score"),
          json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-         req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, now),
+         req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, req.language, now),
     )
     await db.commit()
 
@@ -152,7 +152,7 @@ async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
         sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
         sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
         rubric_id=req.rubric_id, rubric_scores=req.rubric_scores,
-        standards=req.standards, glow_grow=glow_grow,
+        standards=req.standards, glow_grow=glow_grow, language=req.language,
         created_at=now,
     )
 
@@ -162,7 +162,7 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
     cursor = await db.execute(
         """SELECT id, user_id, student_name, feedback_type, context, generated_feedback,
                   tone, grade_level, ratings, sentiment_label, sentiment_score,
-                  sentiment_breakdown, sentiment_keywords, standards_tags, glow_grow, created_at
+                  sentiment_breakdown, sentiment_keywords, standards_tags, glow_grow, language, created_at
            FROM feedback_history WHERE user_id = ? ORDER BY created_at DESC""",
         (user_id,),
     )
@@ -205,7 +205,8 @@ async def get_feedback_history(user_id: str, db=Depends(get_db)):
             ratings=ratings_data, sentiment_label=r[9], sentiment_score=r[10],
             sentiment_breakdown=sentiment_bd, sentiment_keywords=sentiment_kw,
             standards=standards_data, glow_grow=glow_grow_data,
-            created_at=r[15],
+            language=r[15] or "english",
+            created_at=r[16],
         ))
     return results
 
@@ -270,10 +271,10 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
         try:
             feedback_text = await generate_feedback(
                 s_name, req.feedback_type, s_context, req.tone, req.grade_level,
-                s_ratings, rubric_data, s_standards,
+                s_ratings, rubric_data, s_standards, req.language,
             )
             sentiment = await analyze_sentiment(feedback_text)
-            glow_grow = await generate_glow_grow(feedback_text)
+            glow_grow = await generate_glow_grow(feedback_text, req.language)
 
             feedback_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
@@ -286,13 +287,13 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
                 """INSERT INTO feedback_history
                    (id, user_id, student_name, feedback_type, context, generated_feedback, tone, grade_level, ratings,
                     sentiment_label, sentiment_score, sentiment_breakdown, sentiment_keywords,
-                    rubric_id, rubric_scores, standards_tags, glow_grow, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    rubric_id, rubric_scores, standards_tags, glow_grow, language, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (feedback_id, req.user_id, s_name, req.feedback_type,
                  s_context, feedback_text, req.tone, req.grade_level, ratings_json,
                  sentiment.get("label"), sentiment.get("score"),
                  json.dumps(sentiment.get("breakdown")), json.dumps(sentiment.get("keywords", [])),
-                 req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, now),
+                 req.rubric_id, rubric_scores_json, standards_json, glow_grow_json, req.language, now),
             )
             await db.commit()
 
@@ -303,7 +304,7 @@ async def batch_feedback(req: BatchFeedbackRequest, db=Depends(get_db)):
                 sentiment_label=sentiment.get("label"), sentiment_score=sentiment.get("score"),
                 sentiment_breakdown=sentiment.get("breakdown"), sentiment_keywords=sentiment.get("keywords", []),
                 rubric_id=req.rubric_id, rubric_scores=s_rubric_scores,
-                standards=s_standards, glow_grow=glow_grow,
+                standards=s_standards, glow_grow=glow_grow, language=req.language,
                 created_at=now,
             ))
             completed += 1

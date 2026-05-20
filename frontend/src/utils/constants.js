@@ -47,6 +47,23 @@ export const SUMMARY_LENGTHS = [
   { value: "bullet_points", label: "Bullet Points" },
 ];
 
+export const LANGUAGES = [
+  { value: "english", label: "English" },
+  { value: "hindi", label: "Hindi (हिन्दी)" },
+  { value: "tamil", label: "Tamil (தமிழ்)" },
+  { value: "telugu", label: "Telugu (తెలుగు)" },
+  { value: "kannada", label: "Kannada (ಕನ್ನಡ)" },
+  { value: "malayalam", label: "Malayalam (മലയാളം)" },
+  { value: "bengali", label: "Bengali (বাংলা)" },
+  { value: "marathi", label: "Marathi (मराठी)" },
+  { value: "gujarati", label: "Gujarati (ગુજરાતી)" },
+  { value: "punjabi", label: "Punjabi (ਪੰਜਾਬੀ)" },
+  { value: "urdu", label: "Urdu (اردو)" },
+  { value: "spanish", label: "Spanish (Español)" },
+  { value: "french", label: "French (Français)" },
+  { value: "arabic", label: "Arabic (العربية)" },
+];
+
 export const STANDARD_FRAMEWORKS = [
   {
     id: "cbse",

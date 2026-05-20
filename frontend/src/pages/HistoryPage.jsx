@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, Search, PenTool, FileText, Trash2, Copy, Check,
-  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2, Target, Sun, Sprout
+  ChevronDown, ChevronUp, X, Calendar, Filter, Share2, Link2, Target, Sun, Sprout, Globe
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
-import { FEEDBACK_TYPES, TONES, DOCUMENT_TYPES, SUMMARY_LENGTHS } from "../utils/constants";
+import { FEEDBACK_TYPES, TONES, DOCUMENT_TYPES, SUMMARY_LENGTHS, LANGUAGES } from "../utils/constants";
 
 function getLabel(arr, value) {
   return arr.find((i) => i.value === value)?.label || value;
@@ -227,6 +227,12 @@ export default function HistoryPage({ user }) {
                         <span className="badge text-xs bg-violet-50 text-violet-700 flex items-center gap-1">
                           <Target className="w-3 h-3" />
                           {item.standards.length} standard{item.standards.length > 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {tab === "feedback" && item.language && item.language !== "english" && (
+                        <span className="badge text-xs bg-indigo-50 text-indigo-700 flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          {LANGUAGES.find((l) => l.value === item.language)?.label?.split(" (")[0] || item.language}
                         </span>
                       )}
                       {tab === "summary" && (

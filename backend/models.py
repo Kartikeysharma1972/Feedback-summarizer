@@ -30,6 +30,7 @@ class FeedbackRequest(BaseModel):
     rubric_id: Optional[str] = None
     rubric_scores: Optional[dict] = None  # {"criterion_id": 4, ...}
     standards: Optional[list] = None  # [{"code": "CBSE-ENG-R", "name": "Reading Comprehension"}, ...]
+    language: str = "english"
 
 
 class FeedbackResponse(BaseModel):
@@ -49,6 +50,7 @@ class FeedbackResponse(BaseModel):
     rubric_scores: Optional[dict] = None
     standards: Optional[list] = None
     glow_grow: Optional[dict] = None
+    language: Optional[str] = "english"
     created_at: str
 
 
@@ -128,6 +130,7 @@ class BatchFeedbackRequest(BaseModel):
     grade_level: str
     rubric_id: Optional[str] = None
     standards: Optional[list] = None
+    language: str = "english"
     students: list  # list of BatchStudentEntry
 
 

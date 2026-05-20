@@ -4,10 +4,10 @@ import {
   PenTool, Send, Copy, Check, RefreshCw, Sparkles,
   User, BookOpen, MessageSquare, Heart, Star, Download,
   Edit3, Save, Undo2, Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Minus,
-  ClipboardList, ChevronDown, ChevronUp, Target, Sun, Sprout,
+  ClipboardList, ChevronDown, ChevronUp, Target, Sun, Sprout, Globe,
 } from "lucide-react";
 import { useApi } from "../hooks/useApi";
-import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE, STANDARD_FRAMEWORKS } from "../utils/constants";
+import { FEEDBACK_TYPES, TONES, GRADE_LEVELS, API_BASE, STANDARD_FRAMEWORKS, LANGUAGES } from "../utils/constants";
 
 function StarRating({ value, onChange, label }) {
   const [hover, setHover] = useState(0);
@@ -306,6 +306,7 @@ export default function FeedbackPage({ user }) {
   const [rubricScores, setRubricScores] = useState({});
   const [selectedFramework, setSelectedFramework] = useState("");
   const [selectedStandards, setSelectedStandards] = useState([]);
+  const [language, setLanguage] = useState("english");
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -344,6 +345,7 @@ export default function FeedbackPage({ user }) {
           rubric_id: selectedRubricId || null,
           rubric_scores: selectedRubricId && Object.keys(rubricScores).length > 0 ? rubricScores : null,
           standards: selectedStandards.length > 0 ? selectedStandards : null,
+          language,
         }),
       });
       setResult(data);
@@ -399,6 +401,7 @@ export default function FeedbackPage({ user }) {
     setRubricScores({});
     setSelectedFramework("");
     setSelectedStandards([]);
+    setLanguage("english");
     setResult(null);
     setIsEditing(false);
     setOriginalFeedback("");
@@ -618,6 +621,23 @@ export default function FeedbackPage({ user }) {
               </div>
             </div>
 
+            {/* Language */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1.5">
+                <Globe className="w-3.5 h-3.5 inline mr-1.5" />
+                Feedback Language
+              </label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="input-field"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Extra Insight */}
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -743,6 +763,12 @@ export default function FeedbackPage({ user }) {
                       {s.code}
                     </span>
                   ))}
+                  {result.language && result.language !== "english" && (
+                    <span className="badge bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      {LANGUAGES.find((l) => l.value === result.language)?.label || result.language}
+                    </span>
+                  )}
                 </div>
 
                 {isEditing && (
