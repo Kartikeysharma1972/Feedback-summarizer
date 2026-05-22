@@ -232,9 +232,15 @@ export default function FeedbackPage({ user }) {
     setRatings((prev) => ({ ...prev, [type]: value }));
   };
 
+  const hasRatings = Object.keys(ratings).length > 0;
+
   const handleGenerate = async (e) => {
     e.preventDefault();
     setError(null);
+    if (!hasRatings) {
+      setError("Please rate at least one area before generating feedback.");
+      return;
+    }
     try {
       const data = await execute("/feedback/generate", {
         method: "POST",
@@ -443,15 +449,16 @@ export default function FeedbackPage({ user }) {
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !hasRatings}
                 className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+                title={!hasRatings ? "Rate at least one area first" : ""}
               >
                 {loading ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Generate Feedback
+                    {hasRatings ? "Generate Feedback" : "Rate Areas First"}
                   </>
                 )}
               </button>

@@ -69,6 +69,8 @@ async def login(req: LoginRequest, db=Depends(get_db)):
 
 @app.post("/feedback/generate", response_model=FeedbackResponse)
 async def create_feedback(req: FeedbackRequest, db=Depends(get_db)):
+    if not req.ratings or len(req.ratings) == 0:
+        raise HTTPException(status_code=400, detail="Please provide at least one star rating before generating feedback.")
     try:
         feedback_text = await generate_feedback(
             req.student_name, req.feedback_type, req.context or "", req.tone, req.grade_level, req.ratings
